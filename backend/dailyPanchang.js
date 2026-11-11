@@ -996,7 +996,8 @@ export function getDailyDetails(
   dateText,
   utcDate,
   latitude,
-  longitude
+  longitude,
+  riseSet = null
 ) {
 
   dateParts(dateText);
@@ -1025,39 +1026,19 @@ export function getDailyDetails(
   const lon =
     Number(longitude);
 
-  const rise =
-    solarEvent(
-      dateText,
-      lat,
-      lon,
-      true
-    );
-
-  const set =
-    solarEvent(
-      dateText,
-      lat,
-      lon,
-      false
-    );
-
-  const nextRise =
-    solarEvent(
-      addDays(
-        dateText,
-        1
-      ),
-      lat,
-      lon,
-      true
-    );
-
-  const lunar =
-    lunarEvents(
-      dateText,
-      lat,
-      lon
-    );
+  const rise = riseSet ? riseSet.sunrise : solarEvent(dateText, lat, lon, true);
+  const set = riseSet ? riseSet.sunset : solarEvent(dateText, lat, lon, false);
+  const nextRise = riseSet
+    ? riseSet.nextSunrise
+    : solarEvent(addDays(dateText, 1), lat, lon, true);
+  const lunar = riseSet ? {
+    moonrise: riseSet.moonrise?.toISOString() ?? null,
+    moonset: riseSet.moonset?.toISOString() ?? null,
+    moonriseText: riseSet.moonrise ? formatIST(riseSet.moonrise) : 'इस दिन नहीं',
+    moonsetText: riseSet.moonset ? formatIST(riseSet.moonset) : 'इस दिन नहीं',
+    moonriseStatus: riseSet.moonrise ? 'calculated' : 'no_crossing_on_local_date',
+    moonsetStatus: riseSet.moonset ? 'calculated' : 'no_crossing_on_local_date'
+  } : lunarEvents(dateText, lat, lon);
 
   /*
    Panchang transitions for the
@@ -1364,3 +1345,4 @@ export function getThirtyDayCalendar(
 
   return rows;
 }
+

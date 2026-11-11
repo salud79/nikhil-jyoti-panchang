@@ -331,3 +331,39 @@ export async function getSwissSunrisePanchang(sunriseISO) {
     ayanamsaModel: 'Lahiri'
   };
 }
+
+
+// समय भारतीय नागरिक तारीख पर आधारित हैं। ऊँचाई और मौसम के मान परीक्षण जैसे हैं।
+export async function getSwissRiseSet(date, latitude, longitude) {
+  const dayMs = 86400000;
+  const epoch = 2440587.5;
+  const start = Date.parse(date + 'T00:00:00+05:30');
+  if (!Number.isFinite(start) || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error('उदय-अस्त के लिए तारीख और निर्देशांक चाहिए।');
+  }
+
+  const swiss = await getEngine();
+  const position = [longitude, latitude, 0];
+
+  function event(day, body, mode) {
+    let jd;
+    try {
+      jd = swiss.swe_rise_trans(day / dayMs + epoch, body, null, 4, mode, position, 0, 15);
+    } catch (error) {
+      if (error?.flag === -2) return null;
+      throw error;
+    }
+
+    if (!Number.isFinite(jd)) throw new Error('उदय-अस्त का समय अमान्य है।');
+    const ms = Math.round((jd - epoch) * dayMs);
+    return ms >= day && ms < day + dayMs ? new Date(ms) : null;
+  }
+
+  return {
+    sunrise: event(start, 0, 1),
+    sunset: event(start, 0, 2),
+    nextSunrise: event(start + dayMs, 0, 1),
+    moonrise: event(start, 1, 1),
+    moonset: event(start, 1, 2)
+  };
+}

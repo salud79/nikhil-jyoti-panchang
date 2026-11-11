@@ -1,4 +1,4 @@
-import { getSwissSunrisePanchang } from './swissPanchang';
+import { getSwissRiseSet, getSwissSunrisePanchang } from './swissPanchang';
 
 /*
  Nikhil Jyoti Panchang
@@ -355,6 +355,14 @@ export const getPanchang = webMethod(
      Daily Panchang and solar events.
     */
 
+    let riseSet = null;
+    try {
+      riseSet = await getSwissRiseSet(date, latitude, longitude);
+    } catch (error) {
+      console.error('Swiss Ephemeris rise/set failed:', error);
+      errors.push({ engine: 'swissRiseSet', message: 'Swiss Ephemeris उदय-अस्त उपलब्ध नहीं है।' });
+    }
+
     const daily = runEngine(
       'dailyPanchang',
 
@@ -362,7 +370,8 @@ export const getPanchang = webMethod(
         date,
         utc,
         latitude,
-        longitude
+        longitude,
+        riseSet
       ),
 
       errors
@@ -674,7 +683,11 @@ export const getPanchang = webMethod(
        Daily Panchang.
       */
 
-      daily: daily ? { ...daily, swissSunrise } : daily,
+      daily: daily ? {
+        ...daily,
+        swissSunrise,
+        riseSetSource: riseSet ? 'Swiss Ephemeris' : 'legacy-approximation'
+      } : daily,
 
       /*
        Planetary positions.
@@ -831,3 +844,4 @@ export const runAstronomyValidation = webMethod(
 
   }
 );
+
