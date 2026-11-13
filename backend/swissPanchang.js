@@ -142,11 +142,11 @@ function karanaName(index) {
   ];
 }
 
-function nextChange(start, readIndex) {
+function nextChange(start, readIndex, step = STEP_MS) {
   const initial = readIndex(start);
   let left = start;
 
-  for (let right = start + STEP_MS; right <= start + MAX_SEARCH_MS; right += STEP_MS) {
+  for (let right = start + step; right <= start + MAX_SEARCH_MS; right += step) {
     if (readIndex(right) === initial) {
       left = right;
       continue;
@@ -165,10 +165,38 @@ function nextChange(start, readIndex) {
   throw new Error('72 घंटे के भीतर अगला बदलाव नहीं मिला।');
 }
 
+// sweph-wasm 2.6.9 के wrapper में इन कॉलों के कुछ buffers मुक्त नहीं होते।
+function calcUt(swiss, jd, body, flags) {
+  const wasm = swiss.wasm;
+  const buffer = wasm._malloc(48 + 256);
+  if (!buffer) throw new Error('Swiss Ephemeris buffer allocation failed');
+  try {
+    const flag = wasm._swe_calc_ut(jd, body, flags, buffer, buffer + 48);
+    if (flag < 0) throw new Error('Swiss Ephemeris longitude error ' + flag);
+    return Array.from({ length: 6 }, (_, i) => wasm.getValue(buffer + i * 8, 'double'));
+  } finally {
+    wasm._free(buffer);
+  }
+}
+
+function riseTransit(swiss, jd, body, mode, position) {
+  const wasm = swiss.wasm;
+  const buffer = wasm._malloc(32 + 256);
+  if (!buffer) throw new Error('Swiss Ephemeris buffer allocation failed');
+  try {
+    position.forEach((value, i) => wasm.setValue(buffer + i * 8, value, 'double'));
+    const flag = wasm._swe_rise_trans(jd, body, 0, 4, mode, buffer, 0, 15, buffer + 24, buffer + 32);
+    if (flag < 0) throw Object.assign(new Error('Swiss Ephemeris rise/set error ' + flag), { flag });
+    return wasm.getValue(buffer + 24, 'double');
+  } finally {
+    wasm._free(buffer);
+  }
+}
+
 function calculateAt(swiss, time) {
   const jd = time / 86400000 + 2440587.5;
-  const siderealSun = swiss.swe_calc_ut(jd, 0, SIDEREAL_FLAGS)[0];
-  const siderealMoon = swiss.swe_calc_ut(jd, 1, SIDEREAL_FLAGS)[0];
+  const siderealSun = calcUt(swiss, jd, 0, SIDEREAL_FLAGS)[0];
+  const siderealMoon = calcUt(swiss, jd, 1, SIDEREAL_FLAGS)[0];
   if (![siderealSun, siderealMoon].every(Number.isFinite)) {
     throw new Error('सूर्य या चंद्रमा का देशांतर उपलब्ध नहीं है।');
   }
@@ -296,6 +324,23 @@ function getEngine() {
   return enginePromise;
 }
 
+// व्रत निर्णय के लिए केवल मांगी गई तिथि या नक्षत्र सीमा निकालें।
+export async function getSwissVratSample(time, transition) {
+  if (!Number.isFinite(time) || time < Date.UTC(1899, 11, 20) ||
+      time >= Date.UTC(2101, 0, 15)) {
+    throw new Error('मान्य व्रत गणना समय चाहिए।');
+  }
+  const swiss = await getEngine();
+  const sunrisePanchang = calculateAt(swiss, time);
+  const sunriseTransitionISO = {};
+  if (transition) {
+    const index = transition + 'Index';
+    const end = nextChange(time, instant => calculateAt(swiss, instant)[index], 3600000);
+    sunriseTransitionISO[transition] = new Date(end).toISOString();
+  }
+  return { sunrisePanchang, sunriseTransitionISO };
+}
+
 export async function getSwissSunrisePanchang(sunriseISO) {
   const start = typeof sunriseISO === 'string' ? Date.parse(sunriseISO) : NaN;
   if (!Number.isFinite(start) ||
@@ -348,7 +393,7 @@ export async function getSwissRiseSet(date, latitude, longitude) {
   function event(day, body, mode) {
     let jd;
     try {
-      jd = swiss.swe_rise_trans(day / dayMs + epoch, body, null, 4, mode, position, 0, 15);
+      jd = riseTransit(swiss, day / dayMs + epoch, body, mode, position);
     } catch (error) {
       if (error?.flag === -2) return null;
       throw error;
@@ -365,5 +410,40 @@ export async function getSwissRiseSet(date, latitude, longitude) {
     nextSunrise: event(start + dayMs, 0, 1),
     moonrise: event(start, 1, 1),
     moonset: event(start, 1, 2)
+  };
+}
+
+
+// ग्रह-गोचर चुने हुए क्षण पर है। केतु मध्यम राहु से 180° दूर है।
+export async function getSwissGrahaPositions(date) {
+  const time = date.getTime();
+  if (!Number.isFinite(time)) throw new Error('ग्रह गणना का समय अमान्य है।');
+
+  const swiss = await getEngine();
+  const jd = time / 86400000 + 2440587.5;
+  const flags = 4 | 256; // Moshier + speed
+  const bodies = { sun: 0, moon: 1, mars: 4, mercury: 2, jupiter: 5, venus: 3, saturn: 6, rahu: 10 };
+  const positions = {};
+
+  for (const [name, body] of Object.entries(bodies)) {
+    const tropical = calcUt(swiss, jd, body, flags)[0];
+    const sidereal = calcUt(swiss, jd, body, flags | 65536);
+    const [longitude, , , speed] = sidereal;
+    if (![tropical, longitude, speed].every(Number.isFinite)) {
+      throw new Error('ग्रह की स्थिति उपलब्ध नहीं है: ' + name);
+    }
+    positions[name] = { tropical: normalize(tropical), sidereal: normalize(longitude), speed };
+  }
+
+  const rahu = positions.rahu;
+  positions.ketu = {
+    tropical: normalize(rahu.tropical + 180),
+    sidereal: normalize(rahu.sidereal + 180),
+    speed: rahu.speed
+  };
+
+  return {
+    ayanamsa: swiss.swe_get_ayanamsa_ut(jd),
+    positions
   };
 }
