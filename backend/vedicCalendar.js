@@ -419,7 +419,8 @@ export function calculateVedicCalendar(
   latitude,
   longitude,
   sunSiderealLongitude = null,
-  moonSiderealLongitude = null
+  moonSiderealLongitude = null,
+  riseSet = null
 ) {
 
   /*
@@ -455,29 +456,11 @@ export function calculateVedicCalendar(
    the accuracy of these values.
   */
 
-  const rise = solarEvent(
-    dateString,
-    lat,
-    lon,
-    true
-  );
-
-  const set = solarEvent(
-    dateString,
-    lat,
-    lon,
-    false
-  );
-
-  const nextDate =
-    addDays(dateString, 1);
-
-  const tomorrow = solarEvent(
-    nextDate,
-    lat,
-    lon,
-    true
-  );
+  const rise = riseSet ? riseSet.sunrise : solarEvent(dateString, lat, lon, true);
+  const set = riseSet ? riseSet.sunset : solarEvent(dateString, lat, lon, false);
+  const tomorrow = riseSet
+    ? riseSet.nextSunrise
+    : solarEvent(addDays(dateString, 1), lat, lon, true);
 
   if (
     !isValidDate(rise) ||
@@ -656,3 +639,5 @@ export function calculateVedicCalendar(
 
   };
 }
+
+
