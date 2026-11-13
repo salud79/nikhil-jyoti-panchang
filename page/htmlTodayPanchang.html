@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ॐ निखिल ज्योति पंचांग</title>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; color: #432a26; font: 14px/1.45 system-ui, "Noto Sans Devanagari", sans-serif; }
+  article { max-width: 48rem; margin: auto; border: 1px solid #ead0ad; border-radius: 14px; background: #fffaf2; }
+  header, footer { padding: 10px 14px; }
+  header { background: #fff0d9; border-radius: 14px 14px 0 0; }
+  h1 { color: #781d28; font-size: 22px; margin: 0 0 2px; }
+  p { margin: 0; }
+  #caption, .detail { color: #715245; font-size: 12px; }
+  nav { display: flex; gap: 4px; padding: 8px 10px 0; }
+  button, a { font: inherit; }
+  button { flex: 1; border: 1px solid #e7c9a7; border-radius: 7px; background: white; color: #592f29; padding: 5px 3px; cursor: pointer; }
+  button[aria-pressed="true"], a { color: white; background: #781d28; }
+  dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 8px 10px; }
+  dl > div { background: white; border: 1px solid #eedecb; padding: 5px 7px; border-radius: 7px; overflow-wrap: anywhere; }
+  dt { color: #704c39; font-size: 12px; }
+  dd { margin: 0; font-weight: 650; }
+  .detail { font-weight: normal; }
+  footer { border-top: 1px solid #eedecb; }
+  a { display: inline-block; padding: 7px 12px; border-radius: 7px; text-decoration: none; font-weight: 700; }
+  :focus-visible { outline: 2px solid #9b6328; outline-offset: 2px; }
+  @media (min-width: 570px) { dl { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; }
+  .actions > * { flex:0 1 auto; padding:6px 9px; }
+  .day-nav { padding:7px 10px 0; }
+  dialog { width:min(94%, 32rem); max-height:90vh; border:1px solid #ead0ad; border-radius:12px; background:#fffaf2; color:#432a26; }
+  dialog::backdrop { background:#30131388; }
+  dialog h2 { margin:0 0 8px; font-size:18px; }
+  dialog p { margin:8px 0; }
+  textarea { width:100%; font:inherit; margin:8px 0; }
+  .actions > .install-button {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 10px; min-height:44px;
+    border:1px solid #bf8b4b; background:#fff0d9; color:#592f29; text-align:left;
+  }
+  .install-button:hover { background:#f9e2bf; }
+  .install-icon {
+    display:grid; place-items:center; width:26px; height:28px;
+    border-radius:6px; background:#781d28; color:white; font-size:18px;
+  }
+  .install-button strong, .install-button small { display:block; }
+  .install-button small { font-size:11px; }
+  .actions > .share-button {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 10px; min-height:44px;
+    border:1px solid #8bbba4; background:#edf8f1; color:#174b38; text-align:left;
+  }
+  .share-button:not(:disabled):hover { background:#dbeee2; }
+  .share-button:disabled { opacity:.65; cursor:default; }
+  .share-icon {
+    display:grid; place-items:center; width:26px; height:28px;
+    border-radius:6px; background:#236148; color:white; font-size:18px;
+  }
+  .share-button strong, .share-button small { display:block; }
+  .share-button small { font-size:11px; }
+  .brand { display:flex; align-items:center; gap:9px; margin-bottom:4px; }
+  .brand img { flex:none; object-fit:contain; }
+  .brand h1 { font-size:clamp(17px, 5vw, 22px); line-height:1.25; }
+  #title { font-weight:650; }
+</style>
+</head>
+<body>
+<article aria-labelledby="brandTitle">
+  <header>
+    <div class="brand">
+      <img src="https://static.wixstatic.com/media/62d501_b76e9db969e74888ae7c90f335772684~mv2.png" alt="" width="44" height="44">
+      <div>
+        <h1 id="brandTitle">ॐ निखिल ज्योति पंचांग</h1>
+        <p id="title">आज का पंचांग</p>
+      </div>
+    </div>
+    <p id="caption" role="status">पंचांग लोड हो रहा है…</p>
+  </header>
+  <div class="actions day-nav" aria-label="पंचांग की तारीख">
+    <button type="button" id="prev">← पिछला दिन</button>
+    <button type="button" id="today">आज</button>
+    <button type="button" id="next">अगला दिन →</button>
+    <button type="button" id="settings">तारीख और स्थान बदलें</button>
+  </div>
+  <nav aria-label="पंचांग के अनुभाग" id="sections" hidden>
+    <button type="button" data-panel="daily" aria-pressed="true">दैनिक पंचांग</button>
+    <button type="button" data-panel="calendar" aria-pressed="false">मास व राशि</button>
+    <button type="button" data-panel="periods" aria-pressed="false">मुहूर्त व वास</button>
+  </nav>
+  <dl id="daily" hidden></dl>
+  <dl id="calendar" hidden></dl>
+  <dl id="periods" hidden></dl>
+  <footer class="actions">
+    <a id="fullPanchang" href="https://www.nikhiljyoti.in/panchang" target="_top">पूर्ण पंचांग देखें <span aria-hidden="true">→</span></a>
+    <button type="button" id="share" class="share-button" aria-haspopup="dialog" disabled>
+      <span class="share-icon" aria-hidden="true">↗</span>
+      <span><strong>पंचांग शेयर करें</strong><small>WhatsApp · Telegram · कॉपी</small></span>
+    </button>
+    <button type="button" id="install" class="install-button">
+      <span class="install-icon" aria-hidden="true">↓</span>
+      <span><strong>फोन में इंस्टॉल करें</strong><small>पंचांग को होम स्क्रीन पर जोड़ें</small></span>
+    </button>
+  </footer>
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <h2 id="settingsTitle">तारीख और स्थान बदलें</h2>
+    <p><label>तारीख <input id="pickDate" type="date" min="1900-01-01" max="2100-12-31"></label></p>
+    <p><label>शहर या गाँव <input id="placeQuery" type="search" maxlength="70" placeholder="जैसे चकिया या Chakia"></label></p>
+    <div id="placeResults" class="actions"></div>
+    <p id="placeStatus" role="status"></p>
+    <div class="actions">
+      <button type="button" id="useCurrent">वर्तमान स्थान इस्तेमाल करें</button>
+      <form method="dialog"><button>बंद करें</button></form>
+    </div>
+  </dialog>
+  <dialog id="shareDialog" aria-labelledby="shareTitle">
+    <h2 id="shareTitle">पंचांग शेयर करें</h2>
+    <div class="actions">
+      <a id="whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+      <a id="telegram" target="_blank" rel="noopener noreferrer">Telegram</a>
+      <button type="button" id="nativeShare" hidden>अन्य ऐप</button>
+    </div>
+    <textarea id="shareText" aria-label="शेयर करने का टेक्स्ट" rows="6" readonly></textarea>
+    <div class="actions">
+      <button type="button" id="copy">टेक्स्ट कॉपी करें</button>
+      <form method="dialog"><button>बंद करें</button></form>
+    </div>
+    <p id="shareStatus" role="status"></p>
+  </dialog>
+</article>
+
+<script>
+const get = id => document.getElementById(id);
+const panels = ['daily', 'calendar', 'periods'];
+const buttons = [...document.querySelectorAll('[data-panel]')];
+const zone = 'Asia/Kolkata';
+const day = () => new Date(Date.now() + 19800000).toISOString().slice(0, 10);
+const dateFormat = new Intl.DateTimeFormat('hi-IN', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: zone
+});
+const timeFormat = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: zone
+});
+const shortDate = new Intl.DateTimeFormat('hi-IN', { day: 'numeric', month: 'short', timeZone: zone });
+
+const panchangUrl = 'https://www.nikhiljyoti.in/panchang';
+let selected = 'daily';
+let selectedDate = day();
+let lastToday = selectedDate;
+let followsToday = true;
+let requestId = 1;
+let payload;
+let lastRequest = 0;
+let attempts = 0;
+let searchId = 0;
+let searchTimer;
+
+function ask() {
+  lastRequest = Date.now();
+  window.parent.postMessage({ type: 'TODAY_PANCHANG_READY', date: selectedDate, requestId }, '*');
+}
+
+function time(iso, withDate = false) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return '';
+  return withDate ? shortDate.format(ms) + ' · ' + timeFormat.format(ms) : timeFormat.format(ms);
+}
+
+function range(start, end) {
+  return [time(start, true), time(end, true)].filter(Boolean).join(' – ');
+}
+
+function transition(end, next) {
+  return [end && 'समाप्ति ' + time(end, true), next && 'अगला ' + next].filter(Boolean).join(' · ');
+}
+
+function fill(id, rows) {
+  const list = get(id);
+  list.replaceChildren();
+
+  for (const [label, value, detail] of rows) {
+    const group = document.createElement('div');
+    const name = document.createElement('dt');
+    const text = document.createElement('dd');
+    name.textContent = label;
+    text.textContent = value ?? 'उपलब्ध नहीं';
+    group.append(name, text);
+
+    if (detail) {
+      const note = document.createElement('dd');
+      note.className = 'detail';
+      note.textContent = detail;
+      group.append(note);
+    }
+
+    list.append(group);
+  }
+}
+
+function renderPeriods() {
+  const now = payload.date === day() ? Date.now() : NaN;
+  const current = payload.choghadiya.find(item => Date.parse(item.start) <= now && now < Date.parse(item.end));
+  const agni = payload.agniVasa.find(item => Date.parse(item.start) <= now && now < Date.parse(item.end));
+  const agniSchedule = payload.agniVasa.map(item => item.place + ' · ' + range(item.start, item.end)).join(' | ');
+
+  fill('periods', [
+    ['वर्तमान चौघड़िया', current ? current.name + ' · ' + current.quality : 'उपलब्ध नहीं',
+      current ? range(current.start, current.end) : payload.date === day() ? 'आज की तालिका स्थानीय सूर्योदय से शुरू होती है।' : 'वर्तमान चौघड़िया आज की तारीख के लिए दिखता है।'],
+    ['राहुकाल', payload.rahuKaal],
+    ['अग्निवास', agni?.place || payload.agniVasa[0]?.place, agniSchedule],
+    ['शिववास', payload.shivaVasa, payload.nextShivaVasa && payload.tithiEnd
+      ? 'सूर्योदय की तिथि · ' + time(payload.tithiEnd, true) + ' के बाद ' + payload.nextShivaVasa
+      : (payload.shivaVasa ? 'सूर्योदय की तिथि पर' : '')],
+    ['चंद्र वास', payload.chandraVasa, 'सूर्योदय की चंद्र राशि से दिशा']
+  ]);
+}
+
+function render(data) {
+  payload = data;
+  get('title').textContent = data.date === day() ? 'आज का पंचांग' : 'दैनिक पंचांग';
+  get('share').disabled = false;
+  get('caption').textContent = dateFormat.format(Date.parse(data.date + 'T06:30:00Z')) + ' · ' + data.city + ' · IST';
+
+  fill('daily', [
+    ['तिथि', data.tithi, transition(data.tithiEnd, data.nextTithi)],
+    ['नक्षत्र', data.nakshatra, transition(data.nakshatraEnd, data.nextNakshatra)],
+    ['योग', data.yoga], ['करण', data.karana],
+    ['सूर्योदय', time(data.sunrise) || null], ['सूर्यास्त', time(data.sunset) || null],
+    ['चंद्रोदय', time(data.moonrise) || null], ['चंद्रास्त', time(data.moonset) || null]
+  ]);
+
+  fill('calendar', [
+    ['पक्ष', data.paksha], ['विक्रम संवत', data.vikramSamvat],
+    ['अमांत चंद्र माह', data.amantaMonth], ['पूर्णिमांत चंद्र माह', data.purnimantaMonth],
+    ['सूर्य राशि', data.suryaRashi], ['चंद्र राशि', data.chandraRashi],
+    ['ऋतु', data.ritu], ['अयन', data.ayana], ['दिनमान', data.dayLength]
+  ]);
+
+  get('sections').hidden = false;
+  showPanel(selected);
+}
+
+function showPanel(name) {
+  selected = name;
+  if (payload && name === 'periods') renderPeriods();
+  for (const id of panels) get(id).hidden = !payload || id !== name;
+  for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.panel === name));
+}
+
+for (const button of buttons) button.addEventListener('click', () => showPanel(button.dataset.panel));
+
+get('fullPanchang').addEventListener('click', event => {
+  event.preventDefault();
+  window.parent.postMessage({ type: 'OPEN_FULL_PANCHANG' }, '*');
+});
+
+window.addEventListener('message', ({ source, data }) => {
+  if (source !== window.parent) return;
+  if (data?.type === 'HOME_PLACES' && data.id === searchId) {
+    const places = data.result?.places || [];
+    get('placeResults').replaceChildren();
+    get('placeStatus').textContent = !data.result?.success ? 'स्थान खोज अभी उपलब्ध नहीं है।'
+      : places.length ? 'सूची से स्थान चुनें।' : 'कोई स्थान नहीं मिला।';
+    for (const item of places) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = [item.name, item.district, item.state].filter(Boolean).join(', ');
+      button.addEventListener('click', () => {
+        window.parent.postMessage({ type: 'HOME_SET_PLACE', place: {
+          city: button.textContent, latitude: item.latitude, longitude: item.longitude
+        } }, '*');
+      });
+      get('placeResults').append(button);
+    }
+    return;
+  }
+  if (data?.type === 'HOME_PLACE_CHANGED') {
+    get('placeStatus').textContent = data.success ? 'स्थान चुना गया।' : 'वर्तमान स्थान उपलब्ध नहीं है। शहर खोजकर चुनें।';
+    if (data.success) {
+      get('settingsDialog').close();
+      selectDate(selectedDate);
+    }
+    return;
+  }
+  if (data?.requestId !== requestId) return;
+  if (data?.type === 'TODAY_PANCHANG_RESULT' && data.payload?.date === selectedDate) render(data.payload);
+  if (data?.type === 'TODAY_PANCHANG_ERROR' && !payload) {
+    get('caption').textContent = 'आज का पंचांग अभी उपलब्ध नहीं है।';
+  }
+});
+
+function selectDate(date) {
+  if (!date || date < '1900-01-01' || date > '2100-12-31') return;
+  selectedDate = date;
+  requestId++;
+  followsToday = date === day();
+  payload = undefined;
+  attempts = 0;
+  get('title').textContent = followsToday ? 'आज का पंचांग' : 'दैनिक पंचांग';
+  get('sections').hidden = true;
+  get('share').disabled = true;
+  get('caption').textContent = dateFormat.format(Date.parse(date + 'T06:30:00Z')) + ' · लोड हो रहा है…';
+  showPanel(selected);
+  ask();
+}
+
+function shiftDate(step) {
+  const date = new Date(selectedDate + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + step);
+  selectDate(date.toISOString().slice(0, 10));
+}
+
+get('settings').addEventListener('click', () => {
+  get('pickDate').value = selectedDate;
+  get('settingsDialog').showModal();
+});
+get('pickDate').addEventListener('change', event => selectDate(event.target.value));
+get('useCurrent').addEventListener('click', () => {
+  get('placeStatus').textContent = 'वर्तमान स्थान की प्रतीक्षा है…';
+  window.parent.postMessage({ type: 'HOME_CURRENT_PLACE' }, '*');
+});
+get('placeQuery').addEventListener('input', event => {
+  const query = event.target.value.trim();
+  const id = ++searchId;
+  clearTimeout(searchTimer);
+  get('placeResults').replaceChildren();
+  get('placeStatus').textContent = query.length < 2 ? 'कम से कम दो अक्षर लिखें।' : 'स्थान खोज रहे हैं…';
+  if (query.length >= 2) searchTimer = setTimeout(() => {
+    window.parent.postMessage({ type: 'HOME_SEARCH_PLACES', query, id }, '*');
+  }, 400);
+});
+
+get('prev').addEventListener('click', () => shiftDate(-1));
+get('next').addEventListener('click', () => shiftDate(1));
+get('today').addEventListener('click', () => selectDate(day()));
+get('install').addEventListener('click', () => {
+  window.parent.postMessage({ type: 'OPEN_PANCHANG_APP' }, '*');
+});
+
+function shareMessage(data) {
+  const label = dateFormat.format(Date.parse(data.date + 'T06:30:00Z'));
+  const fields = [
+    ['तिथि', [data.paksha, data.tithi].filter(Boolean).join(' ')],
+    ['तिथि का समय', transition(data.tithiEnd, data.nextTithi)],
+    ['नक्षत्र', data.nakshatra],
+    ['नक्षत्र का समय', transition(data.nakshatraEnd, data.nextNakshatra)],
+    ['योग', data.yoga], ['करण', data.karana],
+    ['सूर्योदय', time(data.sunrise)], ['सूर्यास्त', time(data.sunset)],
+    ['चंद्रोदय', time(data.moonrise)], ['चंद्रास्त', time(data.moonset)],
+    ['राहुकाल', data.rahuKaal], ['अमांत चंद्र मास', data.amantaMonth],
+    ['पूर्णिमांत चंद्र मास', data.purnimantaMonth], ['विक्रम संवत', data.vikramSamvat]
+  ];
+  return ['🕉️ निखिल ज्योति पंचांग', label + ' · IST', data.city, '',
+    ...fields.filter(([,value]) => value).map(([key,value]) => key + ' · ' + value),
+    '', 'पूर्ण पंचांग', panchangUrl].join('\n');
+}
+
+get('share').addEventListener('click', () => {
+  if (!payload) return;
+  const message = shareMessage(payload);
+  get('shareText').value = message;
+  get('shareStatus').textContent = '';
+  get('whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(message);
+  get('telegram').href = 'https://t.me/share/url?url=' + encodeURIComponent(panchangUrl) +
+    '&text=' + encodeURIComponent(message.slice(0, message.lastIndexOf('\n\nपूर्ण पंचांग')));
+  get('nativeShare').hidden = typeof navigator.share !== 'function';
+  get('shareDialog').showModal();
+});
+
+get('copy').addEventListener('click', async () => {
+  const field = get('shareText');
+  try {
+    await navigator.clipboard.writeText(field.value);
+    get('shareStatus').textContent = 'पंचांग कॉपी हो गया।';
+  } catch {
+    field.focus();
+    field.select();
+    get('shareStatus').textContent = 'चुने हुए टेक्स्ट को कॉपी करें।';
+  }
+});
+
+get('nativeShare').addEventListener('click', async () => {
+  try {
+    await navigator.share({ title: 'निखिल ज्योति पंचांग', text: get('shareText').value });
+  } catch (error) {
+    if (error.name !== 'AbortError') get('shareStatus').textContent = 'टेक्स्ट कॉपी करके अपने ऐप में भेजें।';
+  }
+});
+
+ask();
+setInterval(() => {
+  if (day() !== lastToday) {
+    lastToday = day();
+    if (followsToday) selectDate(lastToday);
+  }
+  if (!payload && Date.now() - lastRequest >= (attempts < 2 ? 15000 : 60000)) {
+    attempts++;
+    ask();
+  }
+  if (payload && selected === 'periods') renderPeriods();
+}, 5000);
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
