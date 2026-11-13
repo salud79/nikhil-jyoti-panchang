@@ -1,0 +1,1221 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>निखिल ज्योति पंचांग</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#fffaf3;color:#392b24;
+ font:14px/1.5 system-ui,"Noto Sans Devanagari",sans-serif
+}
+.wrap{max-width:1050px;margin:auto;padding:10px}
+h1{font-size:22px;color:#7c1f28;margin:0}
+small,.muted,.note{color:#75695e}
+.note{font-size:12px}
+.head{
+ background:#fff1da;border:1px solid #e5cda7;
+ border-radius:12px;padding:12px;margin-bottom:10px
+}
+.form{
+ display:grid;
+ grid-template-columns:minmax(120px,34%) minmax(0,66%);
+ gap:8px;margin:10px 0
+}
+.place{position:relative;min-width:0}
+input,button{font:inherit}
+input{
+ width:100%;min-width:0;padding:9px;
+ border:1px solid #c9b8a6;border-radius:7px;
+ background:white
+}
+button{
+ border:0;border-radius:7px;background:#7c1f28;
+ color:white;padding:9px 12px;cursor:pointer
+}
+.coords{
+ display:flex;align-items:center;flex-wrap:wrap;gap:7px
+}
+.coords input{width:105px}
+.coords input[type=time]{width:125px}
+button:disabled{opacity:.6;cursor:wait}
+.tabs{
+ display:flex;gap:5px;margin:10px 0;
+ flex-wrap:wrap
+}
+.tabs button{
+ flex:1 1 140px;background:#e8d8c4;
+ color:#593a2e;font-size:12px
+}
+.tabs button.active{
+ background:#7c1f28;color:white
+}
+.panel{display:none}
+.panel.active{display:block}
+.card{
+ background:white;border:1px solid #e9dccb;
+ border-radius:10px;padding:11px;min-width:0
+}
+.card h2{
+ font-size:16px;color:#7c1f28;margin:0 0 8px;
+ border-bottom:1px solid #eee2d5;padding-bottom:5px
+}
+.two-col{
+ display:grid;
+ grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ gap:10px;margin:10px 0;align-items:start
+}
+.tiles{
+ display:grid;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:7px
+}
+.tile{
+ text-align:center;background:#f8f0e4;
+ padding:8px 4px;border-radius:7px
+}
+.tile strong{display:block;font-size:15px}
+.data{
+ width:100%;border-collapse:collapse;table-layout:fixed
+}
+.data th,.data td{
+ border-bottom:1px solid #eee2d5;
+ padding:6px 4px;text-align:left;vertical-align:top;
+ overflow-wrap:anywhere
+}
+.data th{width:37%;font-weight:600;color:#704d39}
+.end{font-size:11px;color:#805b49;margin-top:2px}
+.status{margin:7px 0;color:#7c1f28}
+.suggest{
+ position:absolute;z-index:10;top:100%;left:0;right:0;
+ background:white;border:1px solid #d5c5b0;
+ max-height:230px;overflow:auto;
+ box-shadow:0 7px 18px #0002
+}
+.suggest button{
+ display:block;text-align:left;width:100%;
+ border-radius:0;border-bottom:1px solid #eee;
+ background:white;color:#302921
+}
+.suggest button:hover{background:#fff0df}
+.hidden{display:none!important}
+.graha-layout{
+ display:grid;
+ grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ gap:10px;margin:10px 0;align-items:stretch
+}
+.graha-layout>.card{height:100%}
+.graha-chart-card{
+ display:flex;flex-direction:column
+}
+.north-chart{
+ width:100%;max-width:330px;aspect-ratio:1/1;
+ margin:5px auto
+}
+.north-chart svg{display:block;width:100%;height:100%}
+.north-chart .chart-line{
+ fill:none;stroke:#8c332e;stroke-width:1.8
+}
+.north-chart .rashi-num{
+ fill:#9a362c;font-size:13px;font-weight:700;
+ text-anchor:middle
+}
+.north-chart .graha-text{
+ fill:#29231e;font-size:12px;font-weight:600;
+ text-anchor:middle
+}
+.graha-chart-note{text-align:center;margin:6px 0 0}
+.planet-grid{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:7px
+}
+.planet-item{
+ background:#fffaf4;border:1px solid #eee0d0;
+ border-radius:7px;padding:8px 9px;min-width:0
+}
+.planet-name{
+ color:#7c1f28;font-size:13px;font-weight:700;
+ margin-bottom:2px
+}
+.planet-details{font-size:12px;line-height:1.45}
+.planet-motion{color:#75695e;font-size:11px;margin-top:2px}
+.planet-item:last-child:nth-child(odd){
+ grid-column:1/-1
+}
+.event-card{
+ background:white;border:1px solid #e9dccb;
+ border-radius:10px;padding:11px;min-width:0
+}
+.event-date{
+ color:#7c1f28;font-size:13px;font-weight:700
+}
+.event-name{
+ font-size:16px;font-weight:700;margin:4px 0
+}
+.event-rule{
+ font-size:12px;color:#6c5849;margin-top:7px
+}
+.event-status{
+ display:inline-block;background:#f4ead9;
+ color:#78543c;border-radius:5px;
+ font-size:11px;padding:2px 7px;margin-top:6px
+}
+.section-title{
+ color:#7c1f28;font-size:17px;margin:14px 0 8px
+}
+.time-table{
+ width:100%;border-collapse:collapse
+}
+.time-table th,.time-table td{
+ border-bottom:1px solid #eee2d5;
+ padding:7px 5px;text-align:left;font-size:12px
+}
+.time-table th{background:#f9f0e5}
+.quality-good{color:#176c46;font-weight:700}
+.quality-bad{color:#a23a32}
+@media(max-width:650px){
+ .graha-layout{grid-template-columns:1fr;gap:8px}
+ .graha-chart-card{order:1}
+ .graha-position-card{order:2}
+ .graha-layout>.card{height:auto}
+}
+@media(max-width:600px){
+ .wrap{padding:6px}
+ .two-col{gap:6px}
+ .card{padding:7px}
+ .card h2{font-size:13px}
+ .data th,.data td{font-size:11px;padding:5px 2px}
+ .data th{width:41%}
+ .end{font-size:10px}
+ .tabs button{font-size:11px;padding:8px 3px}
+ .form{
+  grid-template-columns:minmax(110px,40%) minmax(0,60%)
+ }
+ .coords input{width:80px}
+ .coords input[type=time]{width:115px}
+ .coords{font-size:12px}
+ .tile{font-size:11px}
+ .tile strong{font-size:12px}
+}
+@media(max-width:360px){
+ .two-col{grid-template-columns:1fr}
+ .planet-grid{grid-template-columns:1fr}
+ .planet-item:last-child:nth-child(odd){
+  grid-column:auto
+ }
+}
+dialog { width:min(94%, 40rem); border:1px solid #e5c49b; border-radius:1rem; background:#fff7e9; color:#431f21; padding:1.1rem; overflow:visible; }
+dialog::backdrop { background:#29151888; }
+dialog h2 { margin:0 0 .65rem; }
+dialog .coords { flex-wrap:wrap; }
+dialog .suggest { max-height:8rem; overflow:auto; }
+#preferences, #closePreferences, #today { margin:.55rem .35rem 0 0; }
+#preferences { display: block; margin-top: 10px; }
+.day-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px; }
+.day-nav button { background:#f4ead9; color:#593a2e; }
+.app-brand { display:flex; align-items:center; gap:9px; }
+.app-brand img { flex:none; object-fit:contain; }
+#preferences, #appInstall { display:inline-block; margin:8px 5px 0 0; }
+#appInstall { background:#f4ead9; color:#593a2e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="head">
+ <div class="app-brand"><img src="https://static.wixstatic.com/media/62d501_b76e9db969e74888ae7c90f335772684~mv2.png" width="44" height="44" alt=""><h1>ॐ निखिल ज्योति पंचांग</h1></div>
+ <small>
+  दैनिक पंचांग • नवग्रह गोचर • व्रत-पर्व • मुहूर्त
+ </small>
+ <button type="button" id="preferences">तारीख और स्थान बदलें</button>
+ <button type="button" id="appInstall" aria-haspopup="dialog">↓ फोन में इंस्टॉल करें</button>
+  <dialog id="installDialog" aria-labelledby="installTitle">
+    <h2 id="installTitle">पंचांग होम स्क्रीन पर जोड़ें</h2>
+    <p>इसी पंचांग पेज को फोन के ब्राउज़र में खोलकर होम स्क्रीन पर जोड़ें। जोड़ते समय नाम पूछे तो <strong>ॐ निखिल ज्योति पंचांग</strong> लिखें।</p>
+    <p><strong>Android · Chrome</strong><br>⋮ मेनू → Add to Home screen → Install या Create shortcut।</p>
+    <p><strong>iPhone · Safari</strong><br>Share → Add to Home Screen → Add। “Open as Web App” दिखे तो उसे चालू रखें।</p>
+    <form method="dialog"><button>बंद करें</button></form>
+  </dialog>
+ <dialog id="preferencesDialog" aria-labelledby="preferencesTitle">
+ <h2 id="preferencesTitle">तारीख और स्थान चुनें</h2>
+ <div class="form">
+  <input id="date" type="date" aria-label="दिनांक">
+  <div class="place">
+   <input id="place" placeholder="शहर / गाँव खोजें"
+          autocomplete="off" aria-label="स्थान">
+   <div id="suggest" class="suggest hidden"></div>
+  </div>
+ </div>
+ <div class="coords">
+  <label for="time">समय (IST)</label>
+  <input id="time" type="time" value="12:00"
+         aria-label="समय भारतीय मानक समय">
+  <label for="lat">अक्षांश</label>
+  <input id="lat" value="25.3176" inputmode="decimal">
+  <label for="lon">देशांतर</label>
+  <input id="lon" value="82.9739" inputmode="decimal">
+  <button id="calculate" type="button">पंचांग पर लौटें</button>
+ </div>
+ <button type="button" id="currentPlace">वर्तमान स्थान इस्तेमाल करें</button>
+ <button type="button" id="today">आज की तारीख</button>
+ <button type="button" id="closePreferences">बंद करें</button>
+ <p id="dialogStatus" aria-live="polite"></p>
+ </dialog>
+ <div id="status" class="status" aria-live="polite"></div>
+</header>
+
+<nav class="tabs">
+ <button data-tab="daily" class="active">
+  दैनिक पंचांग
+ </button>
+ <button data-tab="graha">
+  नवग्रह गोचर
+ </button>
+ <button data-tab="festival">
+  व्रत एवं पर्व
+ </button>
+ <button data-tab="muhurta">
+  चौघड़िया एवं होरा
+ </button>
+ <button data-tab="sankranti">संक्रांति 2026</button>
+</nav>
+
+<section id="sankranti" class="panel">
+ <div class="card">
+  <h2>सूर्य का राशि-प्रवेश · 2026</h2>
+  <p class="note">समय भारतीय मानक समय (IST) में निकटतम सेकंड तक हैं।</p>
+  <p id="sankrantiStatus" aria-live="polite"></p>
+  <button type="button" id="sankrantiRetry" hidden>फिर लोड करें</button>
+  <div id="sankrantiContent"></div>
+ </div>
+</section>
+
+<section id="daily" class="panel active">
+ <nav id="dayNav" class="day-nav" aria-label="पंचांग की तारीख बदलें" hidden><button type="button" data-day-step="-1">← पिछला दिन</button><button type="button" data-day-step="1">अगला दिन →</button></nav>
+ <div id="dailyContent" class="card">
+  दिनांक और स्थान चुनकर पंचांग देखें।
+ </div>
+</section>
+
+<section id="graha" class="panel">
+ <div id="grahaContent" class="card">
+  ग्रह गणना की प्रतीक्षा है।
+ </div>
+</section>
+
+<section id="festival" class="panel">
+ <div id="festivalContent" class="card">
+  व्रत-पर्व की गणना की प्रतीक्षा है।
+ </div>
+</section>
+
+<section id="muhurta" class="panel">
+ <div id="muhurtaContent" class="card">
+  चौघड़िया और होरा की गणना की प्रतीक्षा है।
+ </div>
+</section>
+
+<p class="note">
+ सभी समय भारतीय मानक समय (IST) में हैं।
+ व्रत-पर्व की तिथियाँ स्थानीय पंचांग और लागू नियमों के अनुसार निर्धारित की जाती हैं।
+</p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+
+const esc=x=>String(x??'').replace(
+ /[&<>"']/g,
+ c=>({
+  '&':'&amp;',
+  '<':'&lt;',
+  '>':'&gt;',
+  '"':'&quot;',
+  "'":'&#39;'
+ }[c])
+);
+
+const val=x=>
+ x===null||x===undefined||x===''?
+ 'गणना शेष':esc(x);
+
+const row=(label,value,detail='')=>`
+ <tr>
+  <th>${esc(label)}</th>
+  <td>
+   ${val(value)}
+   ${detail?
+    `<div class="end">${esc(detail)}</div>`:''}
+  </td>
+ </tr>
+`;
+
+const card=(title,body,extraClass='')=>`
+ <div class="card ${extraClass}">
+  <h2>${esc(title)}</h2>
+  ${body}
+ </div>
+`;
+
+const table=rows=>`
+ <table class="data">${rows.join('')}</table>
+`;
+
+const pair=(left,right)=>`
+ <div class="two-col">${left}${right}</div>
+`;
+
+const todayIST=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
+let lastToday=todayIST();
+let followsToday=true;
+let placeConfirmed=true;
+let locationSequence=0;
+$('date').value=lastToday;
+$('place').value='वाराणसी, उत्तर प्रदेश';
+
+let searchSequence=0;
+let calcSequence=0;
+let pendingSearchId=null;
+let pendingCalcId=null;
+let pendingSelection='';
+let displayedSelection='';
+let searchTimer,searchWatch,calcWatch;
+let connected=false;
+
+function post(message){
+ window.parent.postMessage(message,'*');
+}
+
+function status(message){
+ $('status').textContent=message;
+ $('dialogStatus').textContent=message;
+}
+
+function showSuggestions(items){
+ if(!Array.isArray(items)) items=[];
+ const el=$('suggest');
+ el.innerHTML='';
+
+ if(!items.length){
+  el.classList.add('hidden');
+  return;
+ }
+
+ items.forEach(p=>{
+  const b=document.createElement('button');
+  b.type='button';
+  b.textContent=[
+   p.name,p.district,p.state
+  ].filter(Boolean).join(', ');
+
+  b.addEventListener('click',()=>{
+   $('place').value=b.textContent;
+   $('lat').value=p.latitude;
+   $('lon').value=p.longitude;
+   pendingSearchId=null;
+   clearTimeout(searchWatch);
+   el.classList.add('hidden');
+   placeConfirmed=true;
+   saveLocationSelection();
+   calculate();
+  });
+
+  el.appendChild(b);
+ });
+
+ el.classList.remove('hidden');
+}
+
+$('place').addEventListener('input',()=>{
+ placeConfirmed=false;
+ ++locationSequence;
+ pendingSearchId=null;
+ ++searchSequence;
+ clearTimeout(searchTimer);
+ clearTimeout(searchWatch);
+ showSuggestions([]);
+
+ const q=$('place').value.trim();
+
+ if(q.length<2){
+  status('कम से कम दो अक्षर लिखें।');
+  return;
+ }
+
+ searchTimer=setTimeout(()=>{
+  const id='place-'+(++searchSequence);
+  pendingSearchId=id;
+
+  status('स्थान खोजे जा रहे हैं…');
+
+  post({
+   type:'SEARCH_PLACES',
+   requestId:id,
+   query:q
+  });
+
+  searchWatch=setTimeout(()=>{
+   if(id===pendingSearchId){
+    status(
+     'स्थान खोज में विलंब है। अक्षांश-देशांतर स्वयं भर सकते हैं।'
+    );
+   }
+  },14000);
+ },450);
+});
+
+function calculate(){
+ if(!connected) return false;
+ if(!placeConfirmed){
+  status('सूची से स्थान चुनें या सही अक्षांश और देशांतर भरें।');
+  return false;
+ }
+ const time=$('time').value||'12:00';
+
+ if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)){
+  status('समय HH:MM प्रारूप में चुनें।');
+  return;
+ }
+
+ const latText=$('lat').value.trim();
+ const lonText=$('lon').value.trim();
+
+ const lat=Number(latText);
+ const lon=Number(lonText);
+
+ if(
+  !$('date').value||
+  !latText||!lonText||
+  !Number.isFinite(lat)||
+  !Number.isFinite(lon)||
+  Math.abs(lat)>66||
+  Math.abs(lon)>180
+ ){
+  status('दिनांक और सही अक्षांश-देशांतर भरें।');
+  return;
+ }
+
+ const payload={date:$('date').value,time,city:$('place').value.trim(),latitude:lat,longitude:lon};
+ const selection=JSON.stringify(payload);
+ if(selection===pendingSelection || (!pendingCalcId && selection===displayedSelection)) return true;
+ clearTimeout(calcWatch);
+ const id='calc-'+(++calcSequence);
+ pendingSelection=selection;
+ pendingCalcId=id;
+ $('calculate').disabled=true;
+ status('पंचांग की गणना हो रही है…');
+
+ post({
+  type:'CALCULATE_PANCHANG',
+  requestId:id,
+  payload
+ });
+
+ calcWatch=setTimeout(()=>{
+  if(pendingCalcId===id){
+   pendingCalcId=null;
+   pendingSelection='';
+   $('calculate').disabled=false;
+   status('गणना में विलंब है। Wix Backend Logs जाँचें।');
+  }
+ },45000);
+ return true;
+}
+
+function saveLocationSelection(){
+ const city=$('place').value.trim();
+ const lat=$('lat').value.trim();
+ const lon=$('lon').value.trim();
+ if(!city||!lat||!lon) return;
+ post({type:'PANCHANG_SAVE_LOCATION',place:{city,latitude:Number(lat),longitude:Number(lon)}});
+}
+
+$('currentPlace').addEventListener('click',()=>{
+ status('वर्तमान स्थान की अनुमति की प्रतीक्षा है…');
+ post({type:'PANCHANG_USE_CURRENT_LOCATION',requestId:++locationSequence});
+});
+
+$('dayNav').addEventListener('click', event => {
+ const button = event.target.closest('button[data-day-step]');
+ if (!button) return;
+
+ const previous = $('date').value;
+ const date = new Date(previous + 'T00:00:00Z');
+ if (!Number.isFinite(date.getTime())) return;
+
+ date.setUTCDate(date.getUTCDate() + Number(button.dataset.dayStep));
+ const year = date.getUTCFullYear();
+ if (year < 1900 || year > 2100) {
+  status('पंचांग 1900 से 2100 तक उपलब्ध है।');
+  return;
+ }
+
+ $('date').value = date.toISOString().slice(0, 10);
+ if (calculate()) followsToday = $('date').value === todayIST();
+ else $('date').value = previous;
+});
+$('appInstall').addEventListener('click',()=> $('installDialog').showModal());
+const preferences=$('preferencesDialog');
+$('preferences').addEventListener('click',()=>preferences.showModal());
+$('closePreferences').addEventListener('click',()=>preferences.close());
+$('calculate').addEventListener('click',()=>{ if(calculate()) preferences.close(); });
+$('date').addEventListener('change',()=>{
+ followsToday=$('date').value===todayIST();
+ calculate();
+});
+$('today').addEventListener('click',()=>{
+ followsToday=true;
+ $('date').value=todayIST();
+ calculate();
+});
+$('time').addEventListener('change',calculate);
+const editedCoordinates=new Set();
+for(const id of ['lat','lon']) $(''+id).addEventListener('change',()=>{
+ ++locationSequence;
+ editedCoordinates.add(id);
+ if(placeConfirmed || editedCoordinates.size===2){
+  placeConfirmed=true;
+  saveLocationSelection();
+  calculate();
+ }
+});
+$('place').addEventListener('input',()=>editedCoordinates.clear());
+setInterval(()=>{
+ const current=todayIST();
+ if(current===lastToday) return;
+ lastToday=current;
+ if(followsToday){ $('date').value=current; calculate(); }
+},30000);
+
+document.querySelectorAll('[data-tab]').forEach(b=>
+ b.addEventListener('click',()=>{
+  document.querySelectorAll('[data-tab]').forEach(x=>
+   x.classList.toggle('active',x===b)
+  );
+
+  document.querySelectorAll('.panel').forEach(x=>
+   x.classList.toggle(
+    'active',
+    x.id===b.dataset.tab
+   )
+  );
+ })
+);
+
+/* North Indian transit chart */
+
+function northIndianChart(signs){
+ const positions=[
+  {n:1,x:180,y:75},
+  {n:2,x:90,y:33},
+  {n:3,x:43,y:90},
+  {n:4,x:90,y:180},
+  {n:5,x:43,y:270},
+  {n:6,x:90,y:325},
+  {n:7,x:180,y:280},
+  {n:8,x:270,y:325},
+  {n:9,x:317,y:270},
+  {n:10,x:270,y:180},
+  {n:11,x:317,y:90},
+  {n:12,x:270,y:33}
+ ];
+
+ const signMap=new Map(
+  (signs||[]).map(s=>[
+   Number(s.number),s
+  ])
+ );
+
+ const labels=positions.map(p=>{
+  const sign=signMap.get(p.n);
+  const planets=sign?.planets||[];
+
+  const names=planets.map(
+   g=>g.short||g.name
+  );
+
+  const lines=[];
+
+  for(let i=0;i<names.length;i+=3){
+   lines.push(
+    names.slice(i,i+3).join(' ')
+   );
+  }
+
+  return `
+   <text class="rashi-num"
+    x="${p.x}" y="${p.y}">
+    ${p.n}
+   </text>
+   ${lines.map((line,i)=>`
+    <text class="graha-text"
+     x="${p.x}" y="${p.y+14+i*12}">
+     ${esc(line)}
+    </text>
+   `).join('')}
+  `;
+ }).join('');
+
+ return `
+  <div class="north-chart">
+   <svg viewBox="0 0 360 360"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="उत्तर भारतीय नवग्रह गोचर">
+    <rect x="2" y="2"
+     width="356" height="356"
+     fill="#fffaf2"
+     stroke="#8c332e"
+     stroke-width="2"/>
+    <path class="chart-line"
+     d="M2 2 L358 358
+        M358 2 L2 358
+        M180 2 L358 180
+        L180 358 L2 180 Z"/>
+    ${labels}
+   </svg>
+  </div>
+ `;
+}
+
+function planetGrid(planets){
+ return `
+  <div class="planet-grid">
+   ${(planets||[]).map(p=>`
+    <div class="planet-item">
+     <div class="planet-name">
+      ${esc(p.name)}
+     </div>
+     <div class="planet-details">
+      ${esc(p.rashi)} ·
+      ${
+       Number.isFinite(Number(p.degreeInSign))
+       ? Number(p.degreeInSign).toFixed(2)
+       : '—'
+      }°
+     </div>
+     <div class="planet-motion">
+      ${esc(p.motionStatus)}
+     </div>
+    </div>
+   `).join('')}
+  </div>
+ `;
+}
+
+/* Vrat and festival cards */
+
+function festivalStatusLabels(event) {
+ if(event.status==='sunrise-tithi' && event.accuracy==='swiss-ephemeris'){
+  return ['सूर्योदय की तिथि'];
+ }
+ const labels=[];
+ const paranaStatus=event.parana?.status;
+ const usesRules=event.status==='rule-based' ||
+  event.status==='special-yoga' ||
+  (event.id==='pradosh' && event.accuracy==='swiss-ephemeris');
+
+ if(usesRules) labels.push('नियम-आधारित गणना');
+
+ if(event.nakta || event.status==='special-yoga' ||
+    paranaStatus==='afternoon-alternative' || paranaStatus==='after-both'){
+  labels.push('परंपरा के अनुसार विकल्प');
+ }
+
+ if(!usesRules || paranaStatus==='review'){
+  labels.push('सत्यापन शेष');
+ }
+
+ return labels;
+}
+
+function renderFestivals(d){
+ const days=d.calendar||[];
+
+ const entries=days.filter(
+  day=>(day.events||[]).length>0
+ );
+
+ const eventCards=entries.flatMap(day=>
+  (day.events||[]).map(event=>`
+   <div class="event-card">
+    <div class="event-date">
+     ${esc(day.date)}
+    </div>
+    <div class="event-name">
+     ${esc(event.name)}
+    </div>
+    <div>
+     तिथि: ${val(event.tithi)}
+    </div>
+    <div class="event-rule">
+     ${esc(event.rule)}
+    </div>
+    ${festivalStatusLabels(event).map(label => `<span class="event-status">${esc(label)}</span>`).join(" ")}
+   </div>
+  `)
+ );
+
+ $('festivalContent').className='';
+
+ $('festivalContent').innerHTML=`
+  ${card(
+   'आगामी 30 दिनों के व्रत एवं पर्व',
+   '<p class="note">'+
+   'तिथियाँ स्थानीय पंचांग और लागू व्रत-पर्व नियमों के अनुसार हैं। '+
+   'जहाँ परंपरा के अनुसार विकल्प या सत्यापन शेष है, वह संबंधित प्रविष्टि पर दिखता है।'+
+   '</p>'
+  )}
+  <div class="two-col">
+   ${eventCards.join('')||
+    card(
+     'कोई परिणाम नहीं',
+     'इस अवधि में कोई व्रत-पर्व प्रविष्टि नहीं मिली।'
+    )}
+  </div>
+ `;
+}
+
+/* Choghadiya and Hora */
+
+function renderTimeTable(items,kind){
+ if(!items?.length){
+  return '<p class="note">गणना उपलब्ध नहीं।</p>';
+ }
+
+ return `
+  <table class="time-table">
+   <thead>
+    <tr>
+     <th>क्रम</th>
+     <th>${kind==='hora'?'ग्रह':'चौघड़िया'}</th>
+     <th>समय</th>
+    </tr>
+   </thead>
+   <tbody>
+    ${items.map(x=>`
+     <tr>
+      <td>${esc(x.number)}</td>
+      <td>
+       <strong>${esc(
+        kind==='hora'?x.planet:x.name
+       )}</strong>
+       ${kind==='hora'?'':`
+        <div class="${
+         ['शुभ','अमृत','लाभ'].includes(x.name)
+         ?'quality-good'
+         :['काल','रोग','उद्वेग'].includes(x.name)
+          ?'quality-bad':''
+        }">
+         ${esc(x.quality)}
+        </div>
+       `}
+      </td>
+      <td>${esc(x.text)}</td>
+     </tr>
+    `).join('')}
+   </tbody>
+  </table>
+ `;
+}
+
+function renderMuhurta(d){
+ const m=d.muhurtaEngine||{};
+
+ $('muhurtaContent').className='';
+
+ $('muhurtaContent').innerHTML=`
+  ${card(
+   'चौघड़िया एवं ग्रह होरा',
+   '<p class="note">'+
+   'समय स्थानीय सूर्योदय और सूर्यास्त के आधार पर '+
+   'गणना किए गए हैं। सभी समय IST में हैं।'+
+   '</p>'
+  )}
+  <h3 class="section-title">दिन का चौघड़िया</h3>
+  ${pair(
+   card(
+    'दिन — 8 चौघड़िया',
+    renderTimeTable(m.dayChoghadiya,'choghadiya')
+   ),
+   card(
+    'रात्रि — 8 चौघड़िया',
+    renderTimeTable(m.nightChoghadiya,'choghadiya')
+   )
+  )}
+  <h3 class="section-title">ग्रह होरा</h3>
+  ${pair(
+   card(
+    'दिन की 12 होरा',
+    renderTimeTable(m.dayHora,'hora')
+   ),
+   card(
+    'रात्रि की 12 होरा',
+    renderTimeTable(m.nightHora,'hora')
+   )
+  )}
+ `;
+}
+
+/* Main render */
+
+function istWithSeconds(iso,withDate=false){
+ if(typeof iso!=='string'||!iso.endsWith('Z')) return '';
+ const utc=Date.parse(iso);
+ if(!Number.isFinite(utc)) return '';
+
+ const ist=new Date(Math.round(utc/1000)*1000+330*60000).toISOString();
+ const time=ist.slice(11,19);
+ if(!withDate) return time;
+
+ const [year,month,day]=ist.slice(0,10).split('-');
+ return day+'-'+month+'-'+year+' '+time+' IST';
+}
+ 
+function render(d){
+ const daily=d.daily||{};
+ const a=daily.sunrisePanchang||d;
+ const t=daily.sunriseTransitions||{};
+ const next=daily.sunriseNext||{};
+ const v=d.vedic||{};
+ const m=v.muhurta||{};
+
+ const iso=daily.sunriseTransitionISO||{};
+ const end=key=>{
+  const ending=istWithSeconds(iso[key],true)||t[key];
+  return ending&&ending!=='उपलब्ध नहीं'
+   ? 'समाप्ति: '+ending+(next[key]?' · अगला: '+next[key]:'')
+   : 'समाप्ति उपलब्ध नहीं';
+ };
+ const sunrise=istWithSeconds(daily.sunrise)||daily.sunriseText;
+ const sunset=istWithSeconds(daily.sunset)||daily.sunsetText;
+ const moonrise=istWithSeconds(daily.moonrise)||daily.moonriseText;
+ const moonset=istWithSeconds(daily.moonset)||daily.moonsetText;
+
+ const date=new Date(
+  d.date+'T00:00:00+05:30'
+ );
+
+ const weekday=new Intl.DateTimeFormat(
+  'hi-IN',{
+   weekday:'long',
+   timeZone:'Asia/Kolkata'
+  }
+ ).format(date);
+
+ const top=card(
+  'दैनिक पंचांग — '+d.date+' · '+d.city,
+  `<div class="tiles">
+   <div class="tile">
+    वार<strong>${esc(weekday)}</strong>
+   </div>
+   <div class="tile">
+    सूर्योदय<strong>${val(sunrise)}</strong>
+   </div>
+   <div class="tile">
+    सूर्यास्त<strong>${val(sunset)}</strong>
+   </div>
+  </div>`
+ );
+
+ const five=card(
+  'पंचांग के पाँच अंग',
+  table([
+   row('तिथि',a.paksha+' '+a.tithi,end('tithi')),
+   row(
+    'नक्षत्र',
+    a.nakshatra+' · चरण '+a.nakshatraPada,
+    end('nakshatra')
+   ),
+   row('योग',a.yoga,end('yoga')),
+   row('करण',a.karana,end('karana')),
+   row('वार',weekday)
+  ])
+ );
+
+ const muhurta=card(
+  'शुभ-अशुभ काल',
+  table([
+   row('ब्रह्म मुहूर्त',m.brahma),
+   row('अभिजित',m.abhijit),
+   row('विजय',m.vijaya),
+   row('गोधूलि',m.godhuli),
+   row('राहुकाल',m.rahuKaal),
+   row('यमगण्ड',m.yamaGanda),
+   row('गुलिक काल',m.gulikaKaal)
+  ])
+ );
+
+ const celestial=card(
+  'सूर्य, चंद्र एवं काल',
+  table([
+   row('सूर्योदय',sunrise),
+   row('सूर्यास्त',sunset),
+   row('चंद्रोदय',moonrise),
+   row('चंद्रास्त',moonset),
+   row('दिनमान',v.dinmaan),
+   row('रात्रिमान',v.ratrimaan),
+   row('सूर्य राशि',a.suryaRashi),
+   row('चंद्र राशि',a.chandraRashi)
+  ])
+ );
+
+ const calendar=card(
+  'मास, संवत एवं ऋतु',
+  table([
+   row('अमांत मास',v.amantaMonth),
+   row('पूर्णिमांत मास',v.purnimantaMonth),
+   row('विक्रम संवत',v.vikramSamvat),
+   row('शक संवत',v.shakaSamvat),
+   row('गुजराती संवत',v.gujaratiSamvat),
+   row('बृहस्पति संवत्सर',v.brihaspatiSamvatsara),
+   row('ऋतु',v.ritu),
+   row('अयन',v.ayana)
+  ])
+ );
+
+ const cabinet=d.annualCabinet;
+ const mantrimandal=card('वार्षिक ग्रह मंत्रिमंडल', cabinet?.rows?.length
+  ? '<p class="note">विक्रम संवत् '+esc(cabinet.samvat)+' · '+esc(cabinet.city)+' के सूर्योदय-वार पर आधारित</p>'+
+    table(cabinet.rows.map(item=>row(item.office,item.graha,
+      item.event+' · वार-दिन '+item.varaDate+(item.instant ? ' · '+istWithSeconds(item.instant,true) : ''))))
+  : '<p class="note">इस तारीख के लिए वार्षिक मंत्रिमंडल उपलब्ध नहीं है। गणना विक्रम संवत् 2083 के लिए है।</p>');
+
+ $('dayNav').hidden=false;
+ $('dailyContent').className='';
+
+ $('dailyContent').innerHTML=
+  top+
+  pair(five,muhurta)+
+  card('अग्निवास',
+    d.agniVasa?.length ? table(d.agniVasa.map(item=>row(item.place,
+      istWithSeconds(item.start,true)+' – '+istWithSeconds(item.end,true))))+
+      '<p class="note">स्थानीय सूर्योदय से अगले सूर्योदय तक · तिथि और वार के आधार पर</p>'
+    : '<p class="note">अग्निवास उपलब्ध नहीं है।</p>')+
+  pair(celestial,calendar)+
+  mantrimandal+
+  '<p class="note">'+
+  (daily.swissSunrise ? 'दैनिक तिथि, नक्षत्र, योग और करण की गणना Swiss Ephemeris से।' : 'दैनिक पंचांग की गणना की स्थिति ऊपर देखें।')+
+  '</p>';
+
+ const chartCard=card(
+  'उत्तर भारतीय गोचर कुंडली',
+  northIndianChart(d.signs||[])+
+  '<p class="note graha-chart-note">'+
+  'मेष से प्रारम्भ स्थिर राशि-गोचर चित्र। '+
+  'यह जन्म लग्न कुंडली नहीं है।'+
+  '</p>',
+  'graha-chart-card'
+ );
+
+ const positionCard=card(
+  'नवग्रह स्थिति — '+esc(d.time||'12:00')+' IST',
+  planetGrid(d.planets||[]),
+  'graha-position-card'
+ );
+
+ $('grahaContent').className='';
+
+ $('grahaContent').innerHTML=`
+  <div class="graha-layout">
+   ${chartCard}
+   ${positionCard}
+  </div>
+ `;
+
+ renderFestivals(d);
+ renderMuhurta(d);
+
+ const issues=Array.isArray(d.errors)?d.errors:[];
+ status(d.partial
+  ? 'आंशिक पंचांग उपलब्ध। '+
+    issues.map(e=>e.engine).filter(Boolean).join(', ')+
+    ' की गणना जाँचें।'
+  : 'पंचांग तैयार है।');
+}
+
+let sankrantiSequence=0;
+let pendingSankrantiId=null;
+let sankrantiWatch;
+let sankrantiLoaded=false;
+
+function sankrantiError(message){
+ $('sankrantiStatus').textContent=message;
+ $('sankrantiRetry').hidden=false;
+}
+
+function loadSankranti(){
+ if(sankrantiLoaded || pendingSankrantiId!==null || !connected) return;
+
+ const requestId=++sankrantiSequence;
+ pendingSankrantiId=requestId;
+ $('sankrantiRetry').hidden=true;
+ $('sankrantiStatus').textContent='संक्रांति के समय लोड हो रहे हैं…';
+ sankrantiWatch=setTimeout(()=>{
+  pendingSankrantiId=null;
+  sankrantiError('समय प्राप्त करने में विलंब हुआ।');
+ },15000);
+ post({type:'GET_SANKRANTI_2026',requestId});
+}
+
+$('sankrantiRetry').addEventListener('click',loadSankranti);
+document.querySelector('[data-tab="sankranti"]').addEventListener('click',loadSankranti);
+
+function renderSankranti(rows){
+ if(!Array.isArray(rows) || rows.length!==12){
+  sankrantiError('संक्रांति की तालिका प्राप्त नहीं हुई।');
+  return;
+ }
+
+ const dateLabel=new Intl.DateTimeFormat('hi-IN',{
+  day:'numeric',month:'long',year:'numeric',timeZone:'UTC'
+ });
+ const entries=rows.map(entry=>`
+  <tr>
+   <th scope="row">${esc(entry.rashi)}</th>
+   <td>${esc(dateLabel.format(new Date(entry.dateIST+'T00:00:00Z')))}</td>
+   <td>${esc(entry.timeIST)}</td>
+  </tr>`
+ ).join('');
+
+ $('sankrantiContent').innerHTML=`
+  <table class="time-table">
+   <thead><tr><th scope="col">संक्रांति</th><th scope="col">तारीख</th><th scope="col">समय (IST)</th></tr></thead>
+   <tbody>${entries}</tbody>
+  </table>
+  <p class="note">स्रोत · ${esc(rows[0].source)}</p>`;
+ $('sankrantiStatus').textContent='';
+ sankrantiLoaded=true;
+}
+
+/* Wix messages */
+
+window.addEventListener('message',event=>{
+ if(event.source!==window.parent) return;
+ const msg=event.data;
+
+ if(
+  !msg ||
+  typeof msg!=='object' ||
+  Array.isArray(msg)
+ ) return;
+
+ if(msg.type==='PANCHANG_CONNECTED'){
+  if(!connected){
+   connected=true;
+   calculate();
+  }
+  if($('sankranti').classList.contains('active')) loadSankranti();
+  return;
+ }
+
+ if(msg.type==='PANCHANG_LOCATION'){
+  if(msg.requestId!==locationSequence) return;
+  if(!msg.place){
+   if(msg.requestId>0) status('वर्तमान स्थान उपलब्ध नहीं है। सूची से शहर चुन सकते हैं।');
+   return;
+  }
+  clearTimeout(searchTimer);
+  clearTimeout(searchWatch);
+  pendingSearchId=null;
+  showSuggestions([]);
+  $('place').value=msg.place.city;
+  $('lat').value=msg.place.latitude;
+  $('lon').value=msg.place.longitude;
+  placeConfirmed=true;
+  if(msg.requestId>0) saveLocationSelection();
+  calculate();
+  return;
+ }
+
+ if(msg.type==='SANKRANTI_RESULT'){
+  if(event.source!==window.parent || pendingSankrantiId===null ||
+     msg.requestId!==pendingSankrantiId) return;
+
+  clearTimeout(sankrantiWatch);
+  pendingSankrantiId=null;
+  renderSankranti(msg.payload?.rows);
+  return;
+ }
+
+ if(msg.type==='PLACES_RESULT'){
+  if(msg.requestId!==pendingSearchId)return;
+
+  clearTimeout(searchWatch);
+  pendingSearchId=null;
+
+  const p=msg.payload||{};
+  showSuggestions(p.places);
+
+  status(
+   p.success
+    ? ((p.places||[]).length
+       ? 'सूची से स्थान चुनें।'
+       : 'स्थान नहीं मिला।')
+    : String(p.error||'स्थान खोज में त्रुटि।')
+  );
+
+  return;
+ }
+
+ if(msg.type==='PANCHANG_RESULT'){
+  if(msg.requestId!==pendingCalcId)return;
+
+  clearTimeout(calcWatch);
+  pendingCalcId=null;
+  $('calculate').disabled=false;
+
+  if(msg.payload && msg.payload.success){
+   try{
+    render(msg.payload);
+    displayedSelection=pendingSelection;
+   }catch(error){
+    status(
+     'परिणाम दिखाने में त्रुटि: '+
+     String(error.message||error)
+    );
+   }
+  }else{
+   status('पंचांग प्राप्त नहीं हुआ।');
+  }
+
+  pendingSelection='';
+  return;
+ }
+
+ if(msg.type==='PANCHANG_ERROR'){
+  if(msg.requestId!==pendingCalcId)return;
+
+  clearTimeout(calcWatch);
+  pendingCalcId=null;
+  $('calculate').disabled=false;
+
+  pendingSelection='';
+  status(
+   'त्रुटि: '+
+   String(msg.message||'अज्ञात')
+  );
+ }
+});
+
+post({type:'PANCHANG_READY'});
+const readyRetry=setInterval(()=>{
+ if(connected) clearInterval(readyRetry);
+ else post({type:'PANCHANG_READY'});
+},1000);
+setTimeout(()=>clearInterval(readyRetry),15000);
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
