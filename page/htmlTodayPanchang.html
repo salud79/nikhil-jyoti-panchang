@@ -340,20 +340,61 @@ get('install').addEventListener('click', () => {
 
 function shareMessage(data) {
   const label = dateFormat.format(Date.parse(data.date + 'T06:30:00Z'));
-  const fields = [
-    ['तिथि', [data.paksha, data.tithi].filter(Boolean).join(' ')],
-    ['तिथि का समय', transition(data.tithiEnd, data.nextTithi)],
-    ['नक्षत्र', data.nakshatra],
-    ['नक्षत्र का समय', transition(data.nakshatraEnd, data.nextNakshatra)],
-    ['योग', data.yoga], ['करण', data.karana],
-    ['सूर्योदय', time(data.sunrise)], ['सूर्यास्त', time(data.sunset)],
-    ['चंद्रोदय', time(data.moonrise)], ['चंद्रास्त', time(data.moonset)],
-    ['राहुकाल', data.rahuKaal], ['अमांत चंद्र मास', data.amantaMonth],
-    ['पूर्णिमांत चंद्र मास', data.purnimantaMonth], ['विक्रम संवत', data.vikramSamvat]
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23', timeZone: zone
+  });
+
+  function eventTime(iso) {
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return '';
+    return (new Date(ms + 19800000).toISOString().slice(0, 10) === data.date ? '' : shortDate.format(ms) + ' · ') + clock.format(ms);
+  }
+
+  function change(value, end, next) {
+    const time = eventTime(end);
+    return [value, time && 'समाप्ति ' + time, next && 'इसके बाद ' + next].filter(Boolean).join(' · ');
+  }
+
+  const agni = (data.agniVasa || []).map(item =>
+    [item.place, [eventTime(item.start), eventTime(item.end)].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')
+  ).filter(Boolean).join('; ');
+  const shiva = [data.shivaVasa, data.nextShivaVasa && eventTime(data.tithiEnd)
+    ? eventTime(data.tithiEnd) + ' के बाद ' + data.nextShivaVasa : ''].filter(Boolean).join(' · ');
+
+  const sections = [
+    ['📜 पंचांग के अंग', [
+      ['तिथि', change([data.paksha, data.tithi].filter(Boolean).join(' '), data.tithiEnd, data.nextTithi)],
+      ['नक्षत्र', change([data.nakshatra, data.nakshatra && data.nakshatraPada && 'चरण ' + data.nakshatraPada].filter(Boolean).join(' · '), data.nakshatraEnd, data.nextNakshatra)],
+      ['योग', change(data.yoga, data.yogaEnd, data.nextYoga)],
+      ['करण', change(data.karana, data.karanaEnd, data.nextKarana)]
+    ]],
+    ['☀️ सूर्य और चंद्र', [
+      ['सूर्योदय', eventTime(data.sunrise)], ['सूर्यास्त', eventTime(data.sunset)],
+      ['चंद्रोदय', eventTime(data.moonrise)], ['चंद्रास्त', eventTime(data.moonset)],
+      ['सूर्य राशि', data.suryaRashi], ['चंद्र राशि', data.chandraRashi]
+    ]],
+    ['📅 मास, संवत और ऋतु', [
+      ['अमांत मास', data.amantaMonth], ['पूर्णिमांत मास', data.purnimantaMonth],
+      ['विक्रम संवत', data.vikramSamvat], ['शक संवत', data.shakaSamvat],
+      ['ऋतु', data.ritu], ['अयन', data.ayana]
+    ]],
+    ['🕰️ शुभ-अशुभ काल', [
+      ['ब्रह्म मुहूर्त', data.brahma], ['अभिजित मुहूर्त', data.abhijit],
+      ['राहुकाल', data.rahuKaal], ['यमगण्ड', data.yamaGanda], ['गुलिक काल', data.gulikaKaal]
+    ]],
+    ['🪔 वास', [
+      ['अग्निवास', agni], ['शिववास', shiva], ['चंद्रवास', data.chandraVasa]
+    ]]
   ];
-  return ['🕉️ निखिल ज्योति पंचांग', label + ' · IST', data.city, '',
-    ...fields.filter(([,value]) => value).map(([key,value]) => key + ' · ' + value),
-    '', 'पूर्ण पंचांग', panchangUrl].join('\n');
+
+  const blocks = sections.flatMap(([heading, rows]) => {
+    const fields = rows.filter(([, value]) => value !== '' && value != null);
+    return fields.length ? [heading + '\n' + fields.map(([name, value]) => '• ' + name + ' · ' + value).join('\n')] : [];
+  });
+
+  return ['🕉️ निखिल ज्योति पंचांग\n' + label + (data.city ? ' · ' + data.city : '') + '\nसमय भारतीय मानक समय (IST) में',
+    ...blocks, 'पूर्ण पंचांग\n' + panchangUrl].join('\n\n');
 }
 
 get('share').addEventListener('click', () => {
