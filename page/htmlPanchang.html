@@ -206,6 +206,15 @@ button:disabled{opacity:.6;cursor:wait}
   grid-column:auto
  }
 }
+dialog { width:min(94%, 40rem); border:1px solid #e5c49b; border-radius:1rem; background:#fff7e9; color:#431f21; padding:1.1rem; overflow:visible; }
+dialog::backdrop { background:#29151888; }
+dialog h2 { margin:0 0 .65rem; }
+dialog .coords { flex-wrap:wrap; }
+dialog .suggest { max-height:8rem; overflow:auto; }
+#preferences, #closePreferences, #today { margin:.55rem .35rem 0 0; }
+#preferences { display: block; margin-top: 10px; }
+.day-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px; }
+.day-nav button { background:#f4ead9; color:#593a2e; }
 </style>
 </head>
 <body>
@@ -215,6 +224,9 @@ button:disabled{opacity:.6;cursor:wait}
  <small>
   दैनिक पंचांग • नवग्रह गोचर • व्रत-पर्व • मुहूर्त
  </small>
+ <button type="button" id="preferences">तारीख और स्थान बदलें</button>
+ <dialog id="preferencesDialog" aria-labelledby="preferencesTitle">
+ <h2 id="preferencesTitle">तारीख और स्थान चुनें</h2>
  <div class="form">
   <input id="date" type="date" aria-label="दिनांक">
   <div class="place">
@@ -227,12 +239,17 @@ button:disabled{opacity:.6;cursor:wait}
   <label for="time">समय (IST)</label>
   <input id="time" type="time" value="12:00"
          aria-label="समय भारतीय मानक समय">
-  <span>अक्षांश</span>
+  <label for="lat">अक्षांश</label>
   <input id="lat" value="25.3176" inputmode="decimal">
-  <span>देशांतर</span>
+  <label for="lon">देशांतर</label>
   <input id="lon" value="82.9739" inputmode="decimal">
-  <button id="calculate">पंचांग देखें</button>
+  <button id="calculate" type="button">पंचांग पर लौटें</button>
  </div>
+ <button type="button" id="currentPlace">वर्तमान स्थान इस्तेमाल करें</button>
+ <button type="button" id="today">आज की तारीख</button>
+ <button type="button" id="closePreferences">बंद करें</button>
+ <p id="dialogStatus" aria-live="polite"></p>
+ </dialog>
  <div id="status" class="status" aria-live="polite"></div>
 </header>
 
@@ -263,6 +280,7 @@ button:disabled{opacity:.6;cursor:wait}
 </section>
 
 <section id="daily" class="panel active">
+ <nav id="dayNav" class="day-nav" aria-label="पंचांग की तारीख बदलें" hidden><button type="button" data-day-step="-1">← पिछला दिन</button><button type="button" data-day-step="1">अगला दिन →</button></nav>
  <div id="dailyContent" class="card">
   दिनांक और स्थान चुनकर पंचांग देखें।
  </div>
@@ -288,9 +306,7 @@ button:disabled{opacity:.6;cursor:wait}
 
 <p class="note">
  सभी समय भारतीय मानक समय (IST) में हैं।
- वर्तमान खगोलीय मॉडल अनुमानित है।
- व्रत-पर्व की तिथियाँ प्रारंभिक उम्मीदवार हैं,
- अंतिम धार्मिक निर्णय नहीं।
+ व्रत-पर्व की तिथियाँ स्थानीय पंचांग और लागू नियमों के अनुसार निर्धारित की जाती हैं।
 </p>
 </div>
 
@@ -338,14 +354,20 @@ const pair=(left,right)=>`
  <div class="two-col">${left}${right}</div>
 `;
 
-const now=new Date(Date.now()+330*60000);
-$('date').value=now.toISOString().slice(0,10);
+const todayIST=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
+let lastToday=todayIST();
+let followsToday=true;
+let placeConfirmed=true;
+let locationSequence=0;
+$('date').value=lastToday;
 $('place').value='वाराणसी, उत्तर प्रदेश';
 
 let searchSequence=0;
 let calcSequence=0;
 let pendingSearchId=null;
 let pendingCalcId=null;
+let pendingSelection='';
+let displayedSelection='';
 let searchTimer,searchWatch,calcWatch;
 let connected=false;
 
@@ -355,6 +377,7 @@ function post(message){
 
 function status(message){
  $('status').textContent=message;
+ $('dialogStatus').textContent=message;
 }
 
 function showSuggestions(items){
@@ -381,7 +404,9 @@ function showSuggestions(items){
    pendingSearchId=null;
    clearTimeout(searchWatch);
    el.classList.add('hidden');
-   status('स्थान चुना गया।');
+   placeConfirmed=true;
+   saveLocationSelection();
+   calculate();
   });
 
   el.appendChild(b);
@@ -391,6 +416,8 @@ function showSuggestions(items){
 }
 
 $('place').addEventListener('input',()=>{
+ placeConfirmed=false;
+ ++locationSequence;
  pendingSearchId=null;
  ++searchSequence;
  clearTimeout(searchTimer);
@@ -426,7 +453,12 @@ $('place').addEventListener('input',()=>{
  },450);
 });
 
-$('calculate').addEventListener('click',()=>{
+function calculate(){
+ if(!connected) return false;
+ if(!placeConfirmed){
+  status('सूची से स्थान चुनें या सही अक्षांश और देशांतर भरें।');
+  return false;
+ }
  const time=$('time').value||'12:00';
 
  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)){
@@ -452,8 +484,12 @@ $('calculate').addEventListener('click',()=>{
   return;
  }
 
+ const payload={date:$('date').value,time,city:$('place').value.trim(),latitude:lat,longitude:lon};
+ const selection=JSON.stringify(payload);
+ if(selection===pendingSelection || (!pendingCalcId && selection===displayedSelection)) return true;
  clearTimeout(calcWatch);
  const id='calc-'+(++calcSequence);
+ pendingSelection=selection;
  pendingCalcId=id;
  $('calculate').disabled=true;
  status('पंचांग की गणना हो रही है…');
@@ -461,22 +497,83 @@ $('calculate').addEventListener('click',()=>{
  post({
   type:'CALCULATE_PANCHANG',
   requestId:id,
-  payload:{
-   date:$('date').value,
-   time,
-   city:$('place').value,
-   latitude:lat,
-   longitude:lon
-  }
+  payload
  });
 
  calcWatch=setTimeout(()=>{
   if(pendingCalcId===id){
+   pendingCalcId=null;
+   pendingSelection='';
    $('calculate').disabled=false;
    status('गणना में विलंब है। Wix Backend Logs जाँचें।');
   }
  },45000);
+ return true;
+}
+
+function saveLocationSelection(){
+ const city=$('place').value.trim();
+ const lat=$('lat').value.trim();
+ const lon=$('lon').value.trim();
+ if(!city||!lat||!lon) return;
+ post({type:'PANCHANG_SAVE_LOCATION',place:{city,latitude:Number(lat),longitude:Number(lon)}});
+}
+
+$('currentPlace').addEventListener('click',()=>{
+ status('वर्तमान स्थान की अनुमति की प्रतीक्षा है…');
+ post({type:'PANCHANG_USE_CURRENT_LOCATION',requestId:++locationSequence});
 });
+
+$('dayNav').addEventListener('click', event => {
+ const button = event.target.closest('button[data-day-step]');
+ if (!button) return;
+
+ const previous = $('date').value;
+ const date = new Date(previous + 'T00:00:00Z');
+ if (!Number.isFinite(date.getTime())) return;
+
+ date.setUTCDate(date.getUTCDate() + Number(button.dataset.dayStep));
+ const year = date.getUTCFullYear();
+ if (year < 1900 || year > 2100) {
+  status('पंचांग 1900 से 2100 तक उपलब्ध है।');
+  return;
+ }
+
+ $('date').value = date.toISOString().slice(0, 10);
+ if (calculate()) followsToday = $('date').value === todayIST();
+ else $('date').value = previous;
+});
+const preferences=$('preferencesDialog');
+$('preferences').addEventListener('click',()=>preferences.showModal());
+$('closePreferences').addEventListener('click',()=>preferences.close());
+$('calculate').addEventListener('click',()=>{ if(calculate()) preferences.close(); });
+$('date').addEventListener('change',()=>{
+ followsToday=$('date').value===todayIST();
+ calculate();
+});
+$('today').addEventListener('click',()=>{
+ followsToday=true;
+ $('date').value=todayIST();
+ calculate();
+});
+$('time').addEventListener('change',calculate);
+const editedCoordinates=new Set();
+for(const id of ['lat','lon']) $(''+id).addEventListener('change',()=>{
+ ++locationSequence;
+ editedCoordinates.add(id);
+ if(placeConfirmed || editedCoordinates.size===2){
+  placeConfirmed=true;
+  saveLocationSelection();
+  calculate();
+ }
+});
+$('place').addEventListener('input',()=>editedCoordinates.clear());
+setInterval(()=>{
+ const current=todayIST();
+ if(current===lastToday) return;
+ lastToday=current;
+ if(followsToday){ $('date').value=current; calculate(); }
+},30000);
 
 document.querySelectorAll('[data-tab]').forEach(b=>
  b.addEventListener('click',()=>{
@@ -596,6 +693,30 @@ function planetGrid(planets){
 
 /* Vrat and festival cards */
 
+function festivalStatusLabels(event) {
+ if(event.status==='sunrise-tithi' && event.accuracy==='swiss-ephemeris'){
+  return ['सूर्योदय की तिथि'];
+ }
+ const labels=[];
+ const paranaStatus=event.parana?.status;
+ const usesRules=event.status==='rule-based' ||
+  event.status==='special-yoga' ||
+  (event.id==='pradosh' && event.accuracy==='swiss-ephemeris');
+
+ if(usesRules) labels.push('नियम-आधारित गणना');
+
+ if(event.nakta || event.status==='special-yoga' ||
+    paranaStatus==='afternoon-alternative' || paranaStatus==='after-both'){
+  labels.push('परंपरा के अनुसार विकल्प');
+ }
+
+ if(!usesRules || paranaStatus==='review'){
+  labels.push('सत्यापन शेष');
+ }
+
+ return labels;
+}
+
 function renderFestivals(d){
  const days=d.calendar||[];
 
@@ -618,9 +739,7 @@ function renderFestivals(d){
     <div class="event-rule">
      ${esc(event.rule)}
     </div>
-    <span class="event-status">
-     संभावित — सत्यापन आवश्यक
-    </span>
+    ${festivalStatusLabels(event).map(label => `<span class="event-status">${esc(label)}</span>`).join(" ")}
    </div>
   `)
  );
@@ -631,15 +750,15 @@ function renderFestivals(d){
   ${card(
    'आगामी 30 दिनों के व्रत एवं पर्व',
    '<p class="note">'+
-   'यह नियम-आधारित प्रारंभिक सूची है। '+
-   'क्षेत्रीय पर्व और अंतिम व्रत निर्णय अभी शेष हैं।'+
+   'तिथियाँ स्थानीय पंचांग और लागू व्रत-पर्व नियमों के अनुसार हैं। '+
+   'जहाँ परंपरा के अनुसार विकल्प या सत्यापन शेष है, वह संबंधित प्रविष्टि पर दिखता है।'+
    '</p>'
   )}
   <div class="two-col">
    ${eventCards.join('')||
     card(
      'कोई परिणाम नहीं',
-     'इस अवधि में कोई संभावित तिथि नहीं मिली।'
+     'इस अवधि में कोई व्रत-पर्व प्रविष्टि नहीं मिली।'
     )}
   </div>
  `;
@@ -843,22 +962,28 @@ function render(d){
   ])
  );
 
- const mantrimandal=card(
-  'वार्षिक ग्रह मंत्रिमंडल',
-  '<p class="note">'+
-  'वार्षिक ग्रह मंत्रिमंडल की गणना अभी शेष है।'+
-  '</p>'
- );
+ const cabinet=d.annualCabinet;
+ const mantrimandal=card('वार्षिक ग्रह मंत्रिमंडल', cabinet?.rows?.length
+  ? '<p class="note">विक्रम संवत् '+esc(cabinet.samvat)+' · '+esc(cabinet.city)+' के सूर्योदय-वार पर आधारित</p>'+
+    table(cabinet.rows.map(item=>row(item.office,item.graha,
+      item.event+' · वार-दिन '+item.varaDate+(item.instant ? ' · '+istWithSeconds(item.instant,true) : ''))))
+  : '<p class="note">इस तारीख के लिए वार्षिक मंत्रिमंडल उपलब्ध नहीं है। गणना विक्रम संवत् 2083 के लिए है।</p>');
 
+ $('dayNav').hidden=false;
  $('dailyContent').className='';
 
  $('dailyContent').innerHTML=
   top+
   pair(five,muhurta)+
+  card('अग्निवास',
+    d.agniVasa?.length ? table(d.agniVasa.map(item=>row(item.place,
+      istWithSeconds(item.start,true)+' – '+istWithSeconds(item.end,true))))+
+      '<p class="note">स्थानीय सूर्योदय से अगले सूर्योदय तक · तिथि और वार के आधार पर</p>'
+    : '<p class="note">अग्निवास उपलब्ध नहीं है।</p>')+
   pair(celestial,calendar)+
   mantrimandal+
   '<p class="note">'+
-  'सभी समय IST में हैं। गणना अनुमानित है।'+
+  (daily.swissSunrise ? 'दैनिक तिथि, नक्षत्र, योग और करण की गणना Swiss Ephemeris से।' : 'दैनिक पंचांग की गणना की स्थिति ऊपर देखें।')+
   '</p>';
 
  const chartCard=card(
@@ -893,8 +1018,8 @@ function render(d){
  status(d.partial
   ? 'आंशिक पंचांग उपलब्ध। '+
     issues.map(e=>e.engine).filter(Boolean).join(', ')+
-    ' की गणना जाँचें; व्रत-पर्व सत्यापन शेष।'
-  : 'पंचांग तैयार — अनुमानित गणना; व्रत-पर्व सत्यापन शेष।');
+    ' की गणना जाँचें।'
+  : 'पंचांग तैयार है।');
 }
 
 let sankrantiSequence=0;
@@ -954,6 +1079,7 @@ function renderSankranti(rows){
 /* Wix messages */
 
 window.addEventListener('message',event=>{
+ if(event.source!==window.parent) return;
  const msg=event.data;
 
  if(
@@ -963,8 +1089,31 @@ window.addEventListener('message',event=>{
  ) return;
 
  if(msg.type==='PANCHANG_CONNECTED'){
-  connected=true;
+  if(!connected){
+   connected=true;
+   calculate();
+   if(typeof preferences.showModal==='function') preferences.showModal();
+  }
   if($('sankranti').classList.contains('active')) loadSankranti();
+  return;
+ }
+
+ if(msg.type==='PANCHANG_LOCATION'){
+  if(msg.requestId!==locationSequence) return;
+  if(!msg.place){
+   if(msg.requestId>0) status('वर्तमान स्थान उपलब्ध नहीं है। सूची से शहर चुन सकते हैं।');
+   return;
+  }
+  clearTimeout(searchTimer);
+  clearTimeout(searchWatch);
+  pendingSearchId=null;
+  showSuggestions([]);
+  $('place').value=msg.place.city;
+  $('lat').value=msg.place.latitude;
+  $('lon').value=msg.place.longitude;
+  placeConfirmed=true;
+  if(msg.requestId>0) saveLocationSelection();
+  calculate();
   return;
  }
 
@@ -1008,6 +1157,7 @@ window.addEventListener('message',event=>{
   if(msg.payload && msg.payload.success){
    try{
     render(msg.payload);
+    displayedSelection=pendingSelection;
    }catch(error){
     status(
      'परिणाम दिखाने में त्रुटि: '+
@@ -1018,6 +1168,7 @@ window.addEventListener('message',event=>{
    status('पंचांग प्राप्त नहीं हुआ।');
   }
 
+  pendingSelection='';
   return;
  }
 
@@ -1028,6 +1179,7 @@ window.addEventListener('message',event=>{
   pendingCalcId=null;
   $('calculate').disabled=false;
 
+  pendingSelection='';
   status(
    'त्रुटि: '+
    String(msg.message||'अज्ञात')
@@ -1036,8 +1188,22 @@ window.addEventListener('message',event=>{
 });
 
 post({type:'PANCHANG_READY'});
+const readyRetry=setInterval(()=>{
+ if(connected) clearInterval(readyRetry);
+ else post({type:'PANCHANG_READY'});
+},1000);
+setTimeout(()=>clearInterval(readyRetry),15000);
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
 
 
