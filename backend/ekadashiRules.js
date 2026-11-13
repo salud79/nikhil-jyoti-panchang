@@ -36,7 +36,7 @@ function parana(day, dvadashiStart, dvadashiEnd, trayodashiEnd) {
 
   if (dvadashiEnd <= sunrise) {
     return timeWindow(day, sunrise, Math.min(day.sunset, trayodashiEnd),
-      'trayodashi', 'त्रयोदशी में पारण। दिन में त्रयोदशी की उपलब्धता') || {
+      'trayodashi', 'दिन में त्रयोदशी की उपलब्धता। पारण की सीमा का सत्यापन शेष। समय') || {
       date: day.date, status: 'review', text: 'पारण-दिन दिन में त्रयोदशी उपलब्ध नहीं'
     };
   }
@@ -57,39 +57,51 @@ function parana(day, dvadashiStart, dvadashiEnd, trayodashiEnd) {
   };
 }
 
-function specialParana(day, dvadashiStart, dvadashiEnd, trayodashiEnd, nakshatraEnd) {
-  if (nakshatraEnd == null) return parana(day, dvadashiStart, dvadashiEnd, trayodashiEnd);
+// गौड़ीय GCAL, खंड 1.3 और 1.4.1 (मामले 6–7)।
+async function nakshatraMahadwadashi(days, dvadashiStart, dvadashiEnd, index) {
+  const names = new Map([[3, 'जयंती'], [6, 'जया'], [7, 'पापनाशिनी'], [21, 'विजया']]);
+  if (index !== 11) return null;
+  const i = days.findIndex(day => dvadashiStart <= day.sunrise && day.sunrise < dvadashiEnd);
+  if (i < 1 || i + 1 >= days.length || tithi(days[i - 1].sample) >= index) return null;
 
-  const afterBoth = timeWindow(day, Math.max(day.sunrise, dvadashiEnd, nakshatraEnd),
-    Math.min(day.sunset, trayodashiEnd), 'after-both',
-    'तिथि और नक्षत्र दोनों समाप्त होने के बाद दिन में उपलब्ध समय');
-  return afterBoth || {
-    date: day.date, status: 'review',
-    text: day.date + ' · दोनों की समाप्ति के बाद दिन में त्रयोदशी उपलब्ध नहीं। एक के अंत वाला गौण पक्ष परंपरा के अनुसार।'
-  };
+  const day = days[i];
+  const nakshatra = day.sample.sunrisePanchang.nakshatraIndex;
+  if (!names.has(nakshatra) ||
+      days[i + 1].sample.sunrisePanchang.nakshatraIndex !== nakshatra ||
+      (nakshatra !== 21 && dvadashiEnd <= day.sunset)) return null;
+
+  const sample = await at(day.sunrise, 'nakshatra');
+  return { name: names.get(nakshatra), date: day.date, i, nakshatra, nakshatraEnd: endOf(sample, 'nakshatra') };
 }
 
-async function nakshatraConditions(dvadashiStart, dvadashiEnd, days) {
-  const names = new Map([[3, 'पापनाशिनी'], [6, 'जयंती'], [7, 'जया'], [21, 'विजया']]);
-  const result = [];
-  let start = dvadashiStart;
-  while (start < dvadashiEnd) {
-    const sample = await at(start, 'nakshatra');
-    const index = sample.sunrisePanchang.nakshatraIndex;
-    const end = Math.min(dvadashiEnd, endOf(sample, 'nakshatra'));
-    if (!(end > start)) throw new Error('Invalid nakshatra boundary');
-    if (names.has(index)) {
-      for (const day of days) {
-        const overlap = Math.min(end, day.sunset) - Math.max(start, day.sunrise);
-        const qualifies = index === 21
-          ? overlap >= 48 * MINUTE
-          : start <= day.sunrise && day.sunset <= end;
-        if (qualifies) result.push({ name: names.get(index), date: day.date, nakshatraEnd: endOf(sample, 'nakshatra') });
-      }
+function nakshatraParana(day, dvadashiEnd, item) {
+  const { sunrise, sunset } = day;
+  const morningEnd = sunrise + (sunset - sunrise) / 3;
+  const n = item.nakshatraEnd;
+  let start = sunrise;
+  let end = morningEnd;
+
+  if (sunrise < dvadashiEnd) {
+    end = Math.min(morningEnd, dvadashiEnd);
+    if (n < dvadashiEnd) {
+      start = Math.max(sunrise, n);
+      if (n >= morningEnd) end = dvadashiEnd;
     }
-    start = end;
+  } else if (item.nakshatra === 3 || item.nakshatra === 21) {
+    end = Math.min(morningEnd, n);
+  } else {
+    start = Math.max(sunrise, n);
+    if (start >= morningEnd) {
+      return {
+        date: day.date, status: 'after-time', start: iso(start), end: null,
+        text: day.date + ' · ' + localTime(start) + ' IST के बाद पारण'
+      };
+    }
   }
-  return result;
+
+  return timeWindow(day, start, end, 'window', 'पारण') || {
+    date: day.date, status: 'review', text: 'पारण की सीमा का सत्यापन शेष'
+  };
 }
 
 async function calculateCycle(days, start, ekadashi) {
@@ -136,10 +148,11 @@ async function calculateCycle(days, start, ekadashi) {
   if (countSunrises(days, pakshaEndStart, endOf(pakshaEnd, 'tithi')) >= 2) {
     special.push({ name: 'पक्षवर्धिनी', date: firstDvadashi?.date || localDate(end) });
   }
-  special.push(...await nakshatraConditions(end, dvadashiEnd, days));
+  const nakshatraSpecial = await nakshatraMahadwadashi(days, end, dvadashiEnd, tithi(dvadashi));
 
   const decisions = new Map();
   for (const [i, tradition] of [[smarta, 'स्मार्त गृहस्थ'], [vaishnava, 'वैष्णव']]) {
+    if (nakshatraSpecial && tradition === 'वैष्णव') continue;
     if (!decisions.has(i)) decisions.set(i, []);
     decisions.get(i).push(tradition);
   }
@@ -157,19 +170,30 @@ async function calculateCycle(days, start, ekadashi) {
       rule: 'धर्मसिन्धु · केवल एकादशी उपवास। ' + window.text,
       traditions, parana: window, accuracy: 'swiss-ephemeris',
       tithiBoundaries: { ekadashiStart: iso(start), dvadashiStart: iso(end), dvadashiEnd: iso(dvadashiEnd) },
-      status: 'rule-based', validationRequired: window.status === 'review' || window.status === 'afternoon-alternative'
+      status: 'rule-based', validationRequired: window.status !== 'window'
     };
   });
   for (const item of special) {
     const day = days.find(candidate => candidate.date === add(item.date, 1));
     if (!day) continue;
-    const window = specialParana(day, end, dvadashiEnd, trayodashiEnd, item.nakshatraEnd);
+    const window = parana(day, end, dvadashiEnd, trayodashiEnd);
     events.push({
       id: 'mahadwadashi', date: item.date, name: item.name + ' महाद्वादशी',
       tithi: paksha + ' द्वादशी',
       rule: 'धर्मसिन्धु · यदि इस दिन विशेष उपवास रखा जाए। ' + window.text,
       parana: window,
       status: 'special-yoga', accuracy: 'swiss-ephemeris', validationRequired: true
+    });
+  }
+  if (nakshatraSpecial) {
+    const item = nakshatraSpecial;
+    const window = nakshatraParana(days[item.i + 1], dvadashiEnd, item);
+    events.push({
+      id: 'mahadwadashi', date: item.date, name: item.name + ' महाद्वादशी',
+      tithi: 'शुक्ल द्वादशी', traditions: ['वैष्णव'],
+      rule: 'गौड़ीय गणना (GCAL) · ' + window.text,
+      parana: window, status: 'special-yoga', accuracy: 'swiss-ephemeris',
+      validationRequired: window.status === 'review'
     });
   }
   return events;
