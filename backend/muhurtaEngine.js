@@ -624,7 +624,8 @@ function horaSegments(
 export function calculateMuhurtaEngine(
   dateText,
   latitude,
-  longitude
+  longitude,
+  riseSet = null
 ) {
 
   /*
@@ -675,32 +676,11 @@ export function calculateMuhurtaEngine(
    Calculate local solar events.
   */
 
-  const sunrise = solarEvent(
-    dateText,
-    lat,
-    lon,
-    true
-  );
-
-  const sunset = solarEvent(
-    dateText,
-    lat,
-    lon,
-    false
-  );
-
-  const nextDate =
-    addDays(
-      dateText,
-      1
-    );
-
-  const nextSunrise = solarEvent(
-    nextDate,
-    lat,
-    lon,
-    true
-  );
+  const sunrise = riseSet ? riseSet.sunrise : solarEvent(dateText, lat, lon, true);
+  const sunset = riseSet ? riseSet.sunset : solarEvent(dateText, lat, lon, false);
+  const nextSunrise = riseSet
+    ? riseSet.nextSunrise
+    : solarEvent(addDays(dateText, 1), lat, lon, true);
 
   /*
    Step 4:
@@ -843,7 +823,7 @@ export function calculateMuhurtaEngine(
       'Asia/Kolkata',
 
     accuracy:
-      'approximate-solar-times',
+      riseSet ? 'swiss-ephemeris-solar-times' : 'approximate-solar-times',
 
     validationRequired:
       true
@@ -851,3 +831,5 @@ export function calculateMuhurtaEngine(
   };
 
 }
+
+
