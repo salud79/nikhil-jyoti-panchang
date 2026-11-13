@@ -140,7 +140,6 @@ const DAY_SEQUENCES = [
 */
 
 const NIGHT_SEQUENCES = [
-
   // Sunday night
   [
     'शुभ',
@@ -179,14 +178,14 @@ const NIGHT_SEQUENCES = [
 
   // Wednesday night
   [
-    'रोग',
-    'काल',
-    'लाभ',
     'उद्वेग',
     'शुभ',
     'अमृत',
     'चर',
-    'रोग'
+    'रोग',
+    'काल',
+    'लाभ',
+    'उद्वेग'
   ],
 
   // Thursday night
@@ -203,6 +202,18 @@ const NIGHT_SEQUENCES = [
 
   // Friday night
   [
+    'रोग',
+    'काल',
+    'लाभ',
+    'उद्वेग',
+    'शुभ',
+    'अमृत',
+    'चर',
+    'रोग'
+  ],
+
+  // Saturday night
+  [
     'लाभ',
     'उद्वेग',
     'शुभ',
@@ -211,20 +222,7 @@ const NIGHT_SEQUENCES = [
     'रोग',
     'काल',
     'लाभ'
-  ],
-
-  // Saturday night
-  [
-    'उद्वेग',
-    'शुभ',
-    'अमृत',
-    'चर',
-    'रोग',
-    'काल',
-    'लाभ',
-    'उद्वेग'
   ]
-
 ];
 
 /*
@@ -333,7 +331,13 @@ function isValidDate(value) {
  Human-readable text is IST.
 */
 
-function timeInfo(startMs, endMs) {
+function formatChoghadiyaTime(time) {
+  const [hour, minute] = time.split(':');
+  const h = Number(hour);
+  return String(h % 12 || 12).padStart(2, '0') + ':' + minute + (h < 12 ? ' AM' : ' PM');
+}
+
+function timeInfo(startMs, endMs, use12Hour = false) {
 
   const start = new Date(startMs);
   const end = new Date(endMs);
@@ -349,10 +353,10 @@ function timeInfo(startMs, endMs) {
   }
 
   const startText =
-    formatIST(start);
+    use12Hour ? formatChoghadiyaTime(formatIST(start)) : formatIST(start);
 
   const endText =
-    formatIST(end);
+    use12Hour ? formatChoghadiyaTime(formatIST(end)) : formatIST(end);
 
   return {
 
@@ -491,11 +495,7 @@ function choghadiyaSegments(
           'उपलब्ध नहीं',
 
         period,
-
-        ...timeInfo(
-          startMs,
-          endMs
-        )
+        ...timeInfo(startMs, endMs, true)
 
       };
 
