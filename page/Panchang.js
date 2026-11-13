@@ -1,3 +1,6 @@
+import { getAnnualGrahaCabinet } from 'backend/annualGrahaCabinet.web';
+import { resolvePanchangPlace, savePanchangPlace } from 'public/panchangLocation.js';
+import { getAgniVasa } from 'backend/panchangDisplay.web';
 // निखिल ज्योति पंचांग — मुख्य पेज का पूरा Page Code
 import { getPanchang } from 'backend/panchang.web';
 import { searchIndianPlaces } from 'backend/places.web';
@@ -6,6 +9,12 @@ import { getSankranti2026 } from 'backend/sankranti.web';
 $w.onReady(() => {
   const html = $w('#htmlPanchang');
   let panchangSequence = 0;
+  let automaticLocationRequested = false;
+
+  async function sendLocation(requestId, useCurrent) {
+    const place = await resolvePanchangPlace({ useCurrent });
+    send({ type: 'PANCHANG_LOCATION', requestId, place });
+  }
 
   function send(message) {
     try {
@@ -55,13 +64,19 @@ $w.onReady(() => {
     const p = msg.payload || {};
 
     try {
-      const result = await getPanchang({
+      const [result, agniVasa, annualCabinet] = await Promise.all([getPanchang({
         date: p.date,
         time: p.time || '12:00',
         city: p.city,
         latitude: p.latitude,
         longitude: p.longitude
-      });
+      }), getAgniVasa(p.date, p.latitude, p.longitude).catch(error => {
+        console.warn('Agni Vasa unavailable', error);
+        return null;
+      }), getAnnualGrahaCabinet(p.date).catch(error => {
+        console.warn('Annual graha cabinet unavailable', error);
+        return null;
+      })]);
 
       if (sequence === panchangSequence) {
         const daily = result?.daily;
@@ -75,7 +90,7 @@ $w.onReady(() => {
             sunriseNext: swiss.sunriseNext
           }
         } : result;
-        send({ type: 'PANCHANG_RESULT', requestId, payload });
+        send({ type: 'PANCHANG_RESULT', requestId, payload: { ...payload, agniVasa, annualCabinet } });
       }
     } catch (error) {
       if (sequence === panchangSequence) {
@@ -103,6 +118,18 @@ $w.onReady(() => {
     switch (msg.type) {
       case 'PANCHANG_READY':
         connect();
+        if (!automaticLocationRequested) {
+          automaticLocationRequested = true;
+          await sendLocation(0, false);
+        }
+        break;
+      case 'PANCHANG_USE_CURRENT_LOCATION':
+        if (Number.isSafeInteger(msg.requestId) && msg.requestId > 0) {
+          await sendLocation(msg.requestId, true);
+        }
+        break;
+      case 'PANCHANG_SAVE_LOCATION':
+        savePanchangPlace(msg.place);
         break;
       case 'SEARCH_PLACES':
         await handlePlaceSearch(msg);
