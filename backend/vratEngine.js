@@ -1,3 +1,8 @@
+import { calculateVratTithiEvents, SWISS_VRAT_IDS } from './vratTithiRules';
+import { calculateNamedAshtami } from './ashtamiFestivals';
+import { calculateEkadashiEvents } from './ekadashiRules';
+import { getSwissRiseSet, getSwissVratSample } from './swissPanchang';
+import { calculateLunarCalendar } from './lunarCalendar';
 
 /*
  Nikhil Jyoti Panchang
@@ -278,33 +283,43 @@ function madhyahnaPeriod(
   };
 }
 
-/*
- Pradosha period approximation.
+// स्थानीय सूर्यास्त से रात के पहले पाँचवें भाग में त्रयोदशी का समय।
 
- Uses sunset to sunset + 2
- fixed 24-minute ghatis? No.
-
- Here we use sunset +/- 36 min
- as a clearly labelled screening
- window, not a final ritual rule.
-*/
-
-function pradoshaScreeningPeriod(
-  sunset
-) {
-
-  if (!isValidDate(sunset)) {
-    return null;
+function pradoshaWindow(day) {
+  if (!day.solarAvailable || day.nextSunrise <= day.sunset) return null;
+  const sunset = day.sunset.getTime();
+  const end = sunset + (day.nextSunrise.getTime() - sunset) / 5;
+  let start = day.sunset;
+  let tithi = day.sunsetTithi;
+  if (isTithi(tithi, 12)) {
+    start = nextTithiBoundary(start);
+    if (!start || start.getTime() >= end) return null;
+    tithi = tithiAt(start);
   }
+  if (!isTithi(tithi, 13)) return null;
+  const boundary = nextTithiBoundary(start);
+  if (!boundary) return null;
+  return { start, end: new Date(Math.min(end, boundary.getTime())), tithi };
+}
 
-  return {
-    start: new Date(
-      sunset.getTime() - 36 * MINUTE
-    ),
-    end: new Date(
-      sunset.getTime() + 36 * MINUTE
-    )
-  };
+function paranaWindow(day, next) {
+  if (!isTithi(next.sunriseTithi, 12) || !next.solarAvailable) return null;
+  const arunodaya = new Date(day.sunrise.getTime() - 96 * MINUTE);
+  if (!isTithi(tithiAt(arunodaya), 11)) return null;
+  const dvadashiStart = nextTithiBoundary(day.sunrise);
+  const dvadashiEnd = nextTithiBoundary(next.sunrise);
+  if (!dvadashiStart || !dvadashiEnd || !isTithi(tithiAt(dvadashiStart), 12)) return null;
+  const sunrise = next.sunrise.getTime();
+  const hariVasaraEnd = (3 * dvadashiStart.getTime() + dvadashiEnd.getTime()) / 4;
+  const morningEnd = sunrise + (next.sunset.getTime() - sunrise) / 5;
+  const start = Math.max(sunrise, hariVasaraEnd);
+  const end = Math.min(morningEnd, dvadashiEnd.getTime());
+  return end > start ? { start: new Date(start), end: new Date(end) } : null;
+}
+
+function windowText(window) {
+  const minute = date => localTimeText(new Date(Math.round(date.getTime() / MINUTE) * MINUTE));
+  return minute(window.start) + '–' + minute(window.end) + ' IST';
 }
 
 /*
@@ -466,11 +481,38 @@ function makeEvent(
 /*
  Generate candidate observances.
 
- The previous and next days are
- available for future priority
- rules, but no final two-day
- priority decision is made here.
+ The adjacent days are
+ available for observance priority
+ rules. Most observances still need
+ two-day priority validation.
 */
+
+// सूर्योदय या उसके बाद मध्याह्न की समाप्ति से पहले पूर्णिमा हो तो
+// वह दिन व्रत के लिए योग्य है। दो योग्य दिनों में पहले दिन को लें।
+function purnimaVratTithi(day) {
+  const sunriseTithi = day.sunriseTithi;
+  if (isTithi(sunriseTithi, 15, 'शुक्ल')) return sunriseTithi;
+  if (!isTithi(sunriseTithi, 14, 'शुक्ल')) return null;
+
+  const madhyahna = madhyahnaPeriod(day.sunrise, day.sunset);
+  if (!madhyahna) return null;
+
+  const tithi = tithiAt(new Date(madhyahna.end.getTime() - 1));
+  return isTithi(tithi, 15, 'शुक्ल') ? tithi : null;
+}
+
+function ramaNavamiAtMadhyahna(period) {
+  if (!period) return null;
+
+  let instant = period.start;
+  let tithi = tithiAt(instant);
+  if (isTithi(tithi, 8, 'शुक्ल')) {
+    instant = nextTithiBoundary(instant);
+    if (!instant || instant >= period.end) return null;
+    tithi = tithiAt(instant);
+  }
+  return isTithi(tithi, 9, 'शुक्ल') ? { instant, tithi } : null;
+}
 
 function eventsForDay(
   day,
@@ -484,6 +526,20 @@ function eventsForDay(
   const ss = day.sunsetTithi;
   const mr = day.moonriseTithi;
 
+  const fastingTithi = purnimaVratTithi(day);
+  if (fastingTithi && !purnimaVratTithi(previous)) {
+    events.push(
+      makeEvent(
+        day.date,
+        'purnima-vrat',
+        'पूर्णिमा व्रत',
+        'पूर्णिमा तिथि के लिए सूर्योदय और मध्याह्न पर आधारित व्रत-दिन',
+        fastingTithi
+      )
+    );
+  }
+
+
   /*
    Ekadashi candidate.
 
@@ -492,75 +548,31 @@ function eventsForDay(
   */
 
   if (isTithi(sr, 11)) {
+    const parana = paranaWindow(day, next);
 
     events.push(
       makeEvent(
         day.date,
         'ekadashi',
         sr.paksha + ' एकादशी',
-        'सूर्योदय पर एकादशी; दशमी-वेध, महाद्वादशी और पारण निर्णय शेष',
+        parana
+          ? 'अनुमानित पारण ' + next.date + ' · ' + windowText(parana) + '। सामान्य द्वादशी नियम।'
+          : 'सूर्योदय पर एकादशी; दशमी-वेध, महाद्वादशी और पारण निर्णय शेष',
         sr
       )
     );
   }
 
-  /*
-   Pradosh candidate.
-
-   Trayodashi must overlap the
-   screening interval around
-   local sunset.
-  */
-
-  const pradosha =
-    pradoshaScreeningPeriod(
-      day.sunset
-    );
-
-  if (
-    pradosha &&
-    (
-      tithiOverlaps(
-        pradosha.start,
-        pradosha.end,
-        13,
-        'शुक्ल'
-      ) ||
-      tithiOverlaps(
-        pradosha.start,
-        pradosha.end,
-        13,
-        'कृष्ण'
-      )
-    )
-  ) {
-
-    const t =
-      isTithi(ss, 13)
-        ? ss
-        : tithiAt(
-            pradosha.start
-          );
-
-    events.push(
-      makeEvent(
-        day.date,
-        'pradosh',
-        (isTithi(t, 13)
-          ? t.paksha + ' '
-          : '') + 'प्रदोष व्रत',
-        'प्रदोष के अनुमानित कालखंड में त्रयोदशी; दो-दिवसीय प्राथमिकता और परंपरागत निर्णय शेष',
-        isTithi(t, 13) ? t : null,
-        {
-          screeningWindow: {
-            start:
-              pradosha.start.toISOString(),
-            end:
-              pradosha.end.toISOString()
-          }
-        }
-      )
-    );
+  const pradosha = pradoshaWindow(day);
+  if (pradosha) {
+    events.push(makeEvent(
+      day.date,
+      'pradosh',
+      pradosha.tithi.paksha + ' प्रदोष व्रत',
+      'अनुमानित पूजा-समय ' + windowText(pradosha) + '। दो-दिवसीय प्राथमिकता का सत्यापन शेष।',
+      pradosha.tithi,
+      { screeningWindow: { start: pradosha.start.toISOString(), end: pradosha.end.toISOString() } }
+    ));
   }
 
   /*
@@ -601,6 +613,22 @@ function eventsForDay(
       day.sunset
     );
 
+  const navami = ramaNavamiAtMadhyahna(madhyahna);
+  if (navami && !ramaNavamiAtMadhyahna(
+    madhyahnaPeriod(previous.sunrise, previous.sunset)
+  )) {
+    const month = calculateLunarCalendar(day.date, navami.instant);
+    if (month.lunarMonth === 'चैत्र' && !month.isAdhikaMonth) {
+      events.push(makeEvent(
+        day.date,
+        'rama-navami-smarta',
+        'श्री राम नवमी (स्मार्त)',
+        'चैत्र शुक्ल नवमी का स्थानीय मध्याह्न से योग',
+        navami.tithi
+      ));
+    }
+  }
+
   if (
     madhyahna &&
     tithiOverlaps(
@@ -640,7 +668,7 @@ function eventsForDay(
   /*
    Purnima and Amavasya.
 
-   Sunrise-based candidates only.
+   Use the first sunrise for a tithi spanning two sunrises.
   */
 
   if (
@@ -648,7 +676,8 @@ function eventsForDay(
       sr,
       15,
       'शुक्ल'
-    )
+    ) &&
+    !isTithi(previous.sunriseTithi, 15, 'शुक्ल')
   ) {
 
     events.push(
@@ -656,7 +685,7 @@ function eventsForDay(
         day.date,
         'purnima',
         'पूर्णिमा',
-        'सूर्योदय पर पूर्णिमा; स्नान, दान और व्रत का अंतिम निर्णय शेष',
+        'सूर्योदय पर पूर्णिमा तिथि',
         sr
       )
     );
@@ -950,7 +979,7 @@ export function calculateVratCalendar(
 
       'महाद्वादशी के नियम शेष',
 
-      'एकादशी पारण समय शेष',
+      'विशेष एकादशी और महाद्वादशी का पारण निर्णय शेष',
 
       'स्मार्त एवं वैष्णव निर्णय शेष',
 
@@ -1022,5 +1051,179 @@ export function inspectVratTithi(
     validationRequired:
       true
 
+  };
+}
+
+// मौजूदा सूची की प्रविष्टियों के समय Swiss Ephemeris से दोबारा निकालें।
+export async function refineVratTimes(report, latitude, longitude) {
+  if (!report) return report;
+
+  let ashtamiByDate;
+  let pradoshByDate;
+  try {
+    const eveningsByTrayodashi = new Map();
+    const ashtamiAtSunrise = new Map();
+
+    // पहली और आखिरी तारीख की पड़ोसी शाम भी चयन में शामिल करें।
+    for (let offset = -1; offset <= report.days; offset++) {
+      const date = addDays(report.startDate, offset);
+      const day = await getSwissRiseSet(date, latitude, longitude);
+      if (!day.sunset || !day.nextSunrise || day.nextSunrise <= day.sunset) {
+        throw new Error('Missing local Pradosha solar times');
+      }
+
+      if (offset >= 0 && offset < report.days) {
+        if (!day.sunrise) throw new Error('Missing local sunrise for Ashtami');
+        const { sunrisePanchang } = await getSwissVratSample(+day.sunrise, null);
+        if (sunrisePanchang.tithiIndex % 15 === 7) {
+          const label = sunrisePanchang.pakshaShort + ' अष्टमी';
+          ashtamiAtSunrise.set(date, makeEvent(
+            date, 'ashtami', label,
+            'स्थानीय सूर्योदय पर अष्टमी तिथि। Swiss Ephemeris।',
+            { label },
+            { status: 'sunrise-tithi', accuracy: 'swiss-ephemeris', validationRequired: false }
+          ));
+        }
+      }
+
+      const sunset = +day.sunset;
+      const cutoff = sunset + (+day.nextSunrise - sunset) / 5;
+      let start = sunset;
+      let sample = await getSwissVratSample(start, 'tithi');
+      if (sample.sunrisePanchang.tithiIndex % 15 === 11) {
+        start = Date.parse(sample.sunriseTransitionISO.tithi);
+        if (!(start < cutoff)) continue;
+        sample = await getSwissVratSample(start, 'tithi');
+      }
+
+      const tithi = sample.sunrisePanchang;
+      if (tithi.tithiIndex % 15 !== 12) continue;
+      const trayodashiEnd = sample.sunriseTransitionISO.tithi;
+      const end = Math.min(cutoff, Date.parse(trayodashiEnd));
+      if (!(start < end)) continue;
+
+      const evenings = eveningsByTrayodashi.get(trayodashiEnd) || [];
+      evenings.push({ date, sunset, cutoff, start, end, tithi });
+      eveningsByTrayodashi.set(trayodashiEnd, evenings);
+    }
+
+    ashtamiByDate = ashtamiAtSunrise;
+    const time = ms => new Date(Math.round(ms / 1000) * 1000 + IST).toISOString().slice(11, 19);
+    pradoshByDate = new Map();
+    for (const evenings of eveningsByTrayodashi.values()) {
+      const first = evenings[0];
+      const last = evenings[evenings.length - 1];
+      const firstDuration = first.end - first.start;
+      const lastDuration = last.end - last.start;
+      const selected = firstDuration > lastDuration ? first : last;
+      const { date, start, end, tithi } = selected;
+
+      let nakta = null;
+      if (first !== last) {
+        // तीन घटिका संध्या के बाद नक्त। भोजन की समाप्ति के लिए
+        // स्थानीय प्रदोषकाल का अंत हमारी गणना की मानक सीमा है।
+        const firstNaktaStart = Math.max(first.start, first.sunset + 72 * MINUTE);
+        const firstQualifies = firstNaktaStart < first.cutoff && first.end >= first.cutoff;
+        const day = firstDuration !== lastDuration && firstQualifies ? first : last;
+        const from = Math.max(day.start, day.sunset + 72 * MINUTE);
+        nakta = { date: day.date, policy: 'pradosha-end-assumption' };
+        if (from < day.end) {
+          nakta.start = new Date(from).toISOString();
+          nakta.end = new Date(day.end).toISOString();
+          nakta.text = ' नक्तभोजन विकल्प ' + day.date + ' · संध्या के बाद त्रयोदशी की उपलब्धता ' +
+            time(from) + '–' + time(day.end) +
+            ' IST। पहले दिन के लिए प्रदोष के अंत तक त्रयोदशी मानकर चयन।';
+        } else {
+          nakta.text = ' नक्तभोजन के लिए ' + day.date +
+            ' चयनित। उस शाम संध्या के बाद प्रदोषकाल में त्रयोदशी उपलब्ध नहीं।';
+        }
+      }
+
+      const paksha = tithi.pakshaShort;
+      pradoshByDate.set(date, makeEvent(
+        date,
+        'pradosh',
+        paksha + ' प्रदोष व्रत',
+        'पूजा-समय ' + time(start) + '–' + time(end) +
+          ' IST। Swiss Ephemeris · प्रदोषकाल में त्रयोदशी की व्याप्ति।' + (nakta?.text || ''),
+        { label: paksha + ' त्रयोदशी' },
+        {
+          ...(nakta ? { nakta } : {}),
+          accuracy: 'swiss-ephemeris',
+          screeningWindow: {
+            start: new Date(start).toISOString(),
+            end: new Date(end).toISOString()
+          }
+        }
+      ));
+    }
+  } catch (error) {
+    console.warn('Swiss Pradosha decision unavailable', error?.message);
+  }
+
+  let ekadashiByDate;
+  try {
+    const computed = await calculateEkadashiEvents(report.startDate, report.days, latitude, longitude);
+    ekadashiByDate = new Map();
+    for (const event of computed) {
+      if (!ekadashiByDate.has(event.date)) ekadashiByDate.set(event.date, []);
+      ekadashiByDate.get(event.date).push(event);
+    }
+  } catch (error) {
+    console.warn('Dharmasindhu Ekadashi calculation unavailable', error?.message);
+  }
+
+  const namedAshtamiByDate = new Map();
+  try {
+    const computed = await calculateNamedAshtami(
+      report.startDate, report.days, latitude, longitude
+    );
+    for (const event of computed) {
+      if (!namedAshtamiByDate.has(event.date)) namedAshtamiByDate.set(event.date, []);
+      namedAshtamiByDate.get(event.date).push(event);
+    }
+  } catch (error) {
+    console.warn('Named Ashtami calculation unavailable', error?.message);
+  }
+
+  let swissVratByDate;
+  try {
+    const computed = await calculateVratTithiEvents(
+      report.startDate, report.days, latitude, longitude
+    );
+    swissVratByDate = new Map();
+    for (const event of computed) {
+      if (!swissVratByDate.has(event.date)) swissVratByDate.set(event.date, []);
+      swissVratByDate.get(event.date).push(event);
+    }
+  } catch (error) {
+    console.warn('Swiss festival tithi calculation unavailable', error?.message);
+  }
+
+  const calendar = report.calendar.map(row => {
+    const events = row.events.filter(event =>
+      !(ekadashiByDate && event.id === 'ekadashi') &&
+      !(pradoshByDate && event.id === 'pradosh') &&
+      !(ashtamiByDate && event.id === 'ashtami') &&
+      !(swissVratByDate && SWISS_VRAT_IDS.includes(event.id))
+    );
+    if (pradoshByDate?.has(row.date)) events.push(pradoshByDate.get(row.date));
+    if (ashtamiByDate?.has(row.date)) events.push(ashtamiByDate.get(row.date));
+    events.push(...(ekadashiByDate?.get(row.date) || []));
+    events.push(...(namedAshtamiByDate.get(row.date) || []));
+    events.push(...(swissVratByDate?.get(row.date) || []));
+    return { ...row, events, festivals: events.map(event => event.name) };
+  });
+  const events = calendar.flatMap(row => row.events);
+  const result = { ...report, calendar, events, totalEvents: events.length };
+  if (!ekadashiByDate) return result;
+  return {
+    ...result,
+    rulesVersion: swissVratByDate ? '2.1-dharmasindhu-preview' : '2.0-dharmasindhu-preview',
+    limitations: [
+      'विशेष व्रत और सामान्य प्रातःकाल से बाहर के पारण का अंतिम निर्णय शेष',
+      'दर्श श्राद्ध में समान या अनुपलब्ध अपराह्ण व्याप्ति तथा इष्टि का निर्णय शेष',
+      'अन्य क्षेत्रीय व्रत-परंपराओं का सत्यापन शेष'
+    ]
   };
 }
