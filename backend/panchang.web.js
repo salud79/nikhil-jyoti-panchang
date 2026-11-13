@@ -1,4 +1,4 @@
-import { getSwissRiseSet, getSwissSunrisePanchang } from './swissPanchang';
+import { getSwissGrahaPositions, getSwissRiseSet, getSwissSunrisePanchang } from './swissPanchang';
 
 /*
  Nikhil Jyoti Panchang
@@ -71,7 +71,7 @@ import {
 } from './gujaratiCalendar';
 
 import {
-  calculateVratCalendar
+  calculateVratCalendar, refineVratTimes
 } from './vratEngine';
 
 import {
@@ -399,14 +399,22 @@ export const getPanchang = webMethod(
      ayanamsa as astronomy.js.
     */
 
+    let swissGraha = null;
+    try {
+      swissGraha = await getSwissGrahaPositions(utc);
+    } catch (error) {
+      console.error('Swiss Ephemeris graha calculation failed:', error);
+      errors.push({ engine: 'swissGraha', message: 'Swiss Ephemeris ग्रह स्थिति उपलब्ध नहीं है।' });
+    }
+
     const graha = runEngine(
       'grahaEngine',
 
       () => calculateGrahas(
         utc,
         {
-          ayanamsa:
-            astronomy.ayanamsa
+          ayanamsa: swissGraha?.ayanamsa ?? astronomy.ayanamsa,
+          swissPositions: swissGraha?.positions
         }
       ),
 
@@ -471,7 +479,8 @@ export const getPanchang = webMethod(
 
         sunriseAstronomy
           ? sunriseAstronomy.moonLongitude
-          : null
+          : null,
+        riseSet
       ),
 
       errors
@@ -493,7 +502,8 @@ export const getPanchang = webMethod(
 
             () => calculateLunarCalendar(
               date,
-              sunriseDate
+              sunriseDate,
+              { nextSunrise: daily.nextSunrise }
             ),
 
             errors
@@ -511,7 +521,8 @@ export const getPanchang = webMethod(
       () => calculateMuhurtaEngine(
         date,
         latitude,
-        longitude
+        longitude,
+        riseSet
       ),
 
       errors
@@ -549,7 +560,7 @@ export const getPanchang = webMethod(
      religious festival authority.
     */
 
-    const vrat = runEngine(
+    const vratCandidates = runEngine(
       'vratEngine',
 
       () => calculateVratCalendar(
@@ -561,6 +572,8 @@ export const getPanchang = webMethod(
 
       errors
     );
+
+    const vrat = await refineVratTimes(vratCandidates, latitude, longitude);
 
     /*
      Step 12:
@@ -844,4 +857,7 @@ export const runAstronomyValidation = webMethod(
 
   }
 );
+
+
+
 
