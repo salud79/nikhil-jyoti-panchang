@@ -682,31 +682,19 @@ export function calculateGrahas(
       ? options.ayanamsa
       : calculatedAyanamsa;
 
+  const swissPositions = options.swissPositions;
   const planets =
     ORDER.map(name => {
 
-      const tropical =
-        tropicalLongitude(
-          name,
-          date
-        );
-
-      const sidereal =
-        norm(
-          tropical - aya
-        );
-
+      const swiss = swissPositions?.[name];
+      const tropical = swiss ? swiss.tropical : tropicalLongitude(name, date);
+      const sidereal = swiss ? swiss.sidereal : norm(tropical - aya);
       const signIndex =
         Math.floor(
           sidereal / 30
         );
 
-      const speed =
-        dailyMotion(
-          name,
-          date,
-          aya
-        );
+      const speed = swiss ? swiss.speed : dailyMotion(name, date, aya);
 
       /*
        Nodes are mean nodes.
@@ -794,7 +782,7 @@ export function calculateGrahas(
             : null,
 
         accuracy:
-          'approximate'
+          swiss ? 'swiss-ephemeris' : 'approximate'
       };
     });
 
@@ -836,10 +824,10 @@ export function calculateGrahas(
       ),
 
     ayanamsaModel:
-      'legacy-linear-approximation',
+      swissPositions ? 'Lahiri' : 'legacy-linear-approximation',
 
     nodeModel:
-      'approximate-mean-lunar-node',
+      swissPositions ? 'swiss-mean-lunar-node' : 'approximate-mean-lunar-node',
 
     chartType:
       'sidereal-transit-fixed-aries',
@@ -849,9 +837,11 @@ export function calculateGrahas(
     signs,
 
     accuracy:
-      'low-precision-analytical',
+      swissPositions ? 'swiss-ephemeris' : 'low-precision-analytical',
 
     validationRequired:
       true
   };
 }
+
+
