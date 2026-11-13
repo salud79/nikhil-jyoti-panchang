@@ -486,8 +486,8 @@ function sankrantisBetween(
 /*
  * Month name convention.
  *
- * Meena Sankranti -> Chaitra
- * Mesha Sankranti -> Vaishakha
+ * Mesha Sankranti -> Chaitra
+ * Vrishabha Sankranti -> Vaishakha
  */
 
 function nameFromIngress(
@@ -495,7 +495,7 @@ function nameFromIngress(
 ) {
 
   return MONTHS[
-    mod(signIndex + 1, 12)
+    mod(signIndex, 12)
   ];
 }
 
@@ -775,7 +775,7 @@ function chaitraBoundary(year) {
  * sunrise and tithi rules.
  */
 
-function yearCalculations(ms) {
+function yearCalculations(ms, nextSunrise) {
 
   const gregorianYear =
     localYear(ms);
@@ -799,10 +799,19 @@ function yearCalculations(ms) {
     };
   }
 
-  const activeYear =
-    ms >= boundary
-      ? gregorianYear
-      : gregorianYear - 1;
+  // यदि चैत्र प्रतिपदा दोनों स्थानीय सूर्योदयों के बीच पूरी हो जाए,
+  // तो बीच वाले पंचांग दिन में नया संवत दिखाएँ।
+  let skippedPratipada = false;
+  if (Number.isFinite(nextSunrise) && ms < boundary && boundary < nextSunrise) {
+    const pratipadaEnd = phaseEvents(boundary, 12, 2)
+      .find(time => time > boundary);
+
+    skippedPratipada = pratipadaEnd !== undefined && pratipadaEnd <= nextSunrise;
+  }
+
+  const activeYear = ms >= boundary || skippedPratipada
+    ? gregorianYear
+    : gregorianYear - 1;
 
   /*
    Conventional approximate
@@ -848,7 +857,7 @@ function yearCalculations(ms) {
       'approximate',
 
     yearConvention:
-      'चैत्रादि चंद्र वर्ष; अमावस्या-आधारित अनुमान, सूर्योदय नियम शेष'
+      'चैत्रादि चंद्र वर्ष; अगला सूर्योदय उपलब्ध हो तो क्षय प्रतिपदा का नियम लागू'
   };
 }
 
@@ -861,7 +870,8 @@ function yearCalculations(ms) {
 
 export function calculateLunarCalendar(
   dateText,
-  utcDate
+  utcDate,
+  options = {}
 ) {
 
   validDateText(dateText);
@@ -997,7 +1007,7 @@ export function calculateLunarCalendar(
   */
 
   const years =
-    yearCalculations(ms);
+    yearCalculations(ms, Date.parse(options?.nextSunrise));
 
   /*
    Return original field names
@@ -1160,3 +1170,7 @@ export function calculateLunarCalendar(
 
   };
 }
+
+
+
+
