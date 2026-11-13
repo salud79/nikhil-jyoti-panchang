@@ -215,6 +215,8 @@ dialog .suggest { max-height:8rem; overflow:auto; }
 #preferences { display: block; margin-top: 10px; }
 .day-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px; }
 .day-nav button { background:#f4ead9; color:#593a2e; }
+.source-license{margin-top:16px;padding:12px 0 4px;border-top:1px solid #e8d8c5;text-align:center;font-size:13px}
+.source-license a{color:#772227;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -308,6 +310,9 @@ dialog .suggest { max-height:8rem; overflow:auto; }
  सभी समय भारतीय मानक समय (IST) में हैं।
  व्रत-पर्व की तिथियाँ स्थानीय पंचांग और लागू नियमों के अनुसार निर्धारित की जाती हैं।
 </p>
+<footer class="source-license">
+ <a href="https://github.com/salud79/nikhil-jyoti-panchang/releases/tag/v1.2.0" target="_blank" rel="noopener noreferrer">पंचांग का स्रोत कोड और लाइसेंस</a>
+</footer>
 </div>
 
 <script>
@@ -820,7 +825,8 @@ function renderMuhurta(d){
    'गणना किए गए हैं। सभी समय IST में हैं।'+
    '</p>'
   )}
-  <h3 class="section-title">दिन का चौघड़िया</h3>
+  <h3 class="section-title">चौघड़िया</h3>
+  <p class="note">यात्रा या नया काम शुरू करने के लिए अनुकूल समय चुनने की पारंपरिक पद्धति।</p>
   ${pair(
    card(
     'दिन — 8 चौघड़िया',
@@ -832,6 +838,7 @@ function renderMuhurta(d){
    )
   )}
   <h3 class="section-title">ग्रह होरा</h3>
+  <p class="note">ग्रह के अधिपत्य वाला समय-खंड, जिसका उपयोग उस ग्रह से जुड़े कार्यों का समय चुनने में होता है।</p>
   ${pair(
    card(
     'दिन की 12 होरा',
@@ -923,6 +930,7 @@ function render(d){
 
  const muhurta=card(
   'शुभ-अशुभ काल',
+  '<p class="note">अभिजित को शुभ कार्यों के लिए अनुकूल मानते हैं। राहुकाल, यमगण्ड और गुलिक काल में नए शुभ कार्य शुरू करने से बचने की परंपरा है।</p>'+
   table([
    row('ब्रह्म मुहूर्त',m.brahma),
    row('अभिजित',m.abhijit),
@@ -976,10 +984,11 @@ function render(d){
   top+
   pair(five,muhurta)+
   card('अग्निवास',
+    '<p class="note">अग्नि के माने गए वास का संकेत, जिसे हवन और यज्ञ का समय चुनते समय देखा जाता है।</p>'+(
     d.agniVasa?.length ? table(d.agniVasa.map(item=>row(item.place,
       istWithSeconds(item.start,true)+' – '+istWithSeconds(item.end,true))))+
       '<p class="note">स्थानीय सूर्योदय से अगले सूर्योदय तक · तिथि और वार के आधार पर</p>'
-    : '<p class="note">अग्निवास उपलब्ध नहीं है।</p>')+
+    : '<p class="note">अग्निवास उपलब्ध नहीं है।</p>'))+
   pair(celestial,calendar)+
   mantrimandal+
   '<p class="note">'+
